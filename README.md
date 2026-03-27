@@ -120,7 +120,7 @@ nero update
 `./nero update` does two things:
 
 - pulls the latest repo changes with `git pull --ff-only`
-- rebuilds and restarts Nero with the correct proxy mode
+- reruns the full install workflow so permissions, proxy mode, and containers are repaired from the repo state
 
 ## GitHub integration
 

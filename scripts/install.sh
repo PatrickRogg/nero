@@ -40,11 +40,20 @@ detect_proxy_mode() {
 
 compose_up() {
   if [[ "${TRAEFIK_MODE}" == "self" ]]; then
-    ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy up -d --build
+    ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy up -d --build --force-recreate --remove-orphans
     return
   fi
 
-  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" up -d --build
+  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" up -d --build --force-recreate --remove-orphans
+}
+
+compose_down() {
+  if [[ "${TRAEFIK_MODE}" == "self" ]]; then
+    ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy down --remove-orphans || true
+    return
+  fi
+
+  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" down --remove-orphans || true
 }
 
 install_global_command() {
@@ -310,6 +319,7 @@ prepare_runtime_dirs() {
     "${TARGET_DIR}/data/opencode" \
     "${TARGET_DIR}/workspace/agent"
   ${SUDO} chmod 700 "${TARGET_DIR}/config/ssh"
+  ${SUDO} chmod 755 "${TARGET_DIR}/data/opencode"
 }
 
 if [[ -f "${SOURCE_DIR}/.env" ]]; then
@@ -345,6 +355,7 @@ write_env_file
 write_traefik_dynamic_config
 install_global_command
 
+compose_down
 compose_up
 
 cat <<EOF
