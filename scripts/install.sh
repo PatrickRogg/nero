@@ -38,8 +38,25 @@ port_in_use() {
 }
 
 detect_proxy_mode() {
+  case "${TRAEFIK_MODE:-external}" in
+    self|external)
+      TRAEFIK_MODE="${TRAEFIK_MODE:-external}"
+      return
+      ;;
+    auto)
+      ;;
+    *)
+      TRAEFIK_MODE="external"
+      return
+      ;;
+  esac
+
   if port_in_use 80 || port_in_use 443; then
-    TRAEFIK_MODE="external"
+    if ${SUDO} docker ps --format '{{.Names}}' | grep -qx "${PROJECT_NAME}-traefik"; then
+      TRAEFIK_MODE="self"
+    else
+      TRAEFIK_MODE="external"
+    fi
   else
     TRAEFIK_MODE="self"
   fi
@@ -94,6 +111,20 @@ http:
         servers:
           - url: http://${PROJECT_NAME}-opencode:4096
 EOF
+}
+
+initialize_workspace_structure() {
+  local template_root="${SOURCE_DIR}/templates/workspace"
+  local workspace_root="${TARGET_DIR}/workspace/agent"
+
+  ${SUDO} mkdir -p "${workspace_root}"
+
+  if [[ ! -d "${template_root}" ]]; then
+    return
+  fi
+
+  ${SUDO} cp -an "${template_root}/." "${workspace_root}/"
+  ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${workspace_root}"
 }
 
 prompt_yes_no() {
@@ -360,6 +391,7 @@ install_docker
 write_env_file
 sync_project
 prepare_runtime_dirs
+initialize_workspace_structure
 setup_github_auth
 write_env_file
 write_traefik_dynamic_config

@@ -17,6 +17,7 @@ Usage: ./nero <command>
 
 Commands:
   bootstrap   Prepare a fresh Ubuntu 24.04 VM
+  doctor      Show deployment health and config summary
   install     Install or re-install Nero
   update      Pull latest repo changes and redeploy Nero
   help        Show this help
@@ -26,6 +27,9 @@ EOF
 case "${COMMAND}" in
   bootstrap)
     exec bash "${PROJECT_DIR}/scripts/bootstrap-ubuntu-24.sh"
+    ;;
+  doctor)
+    exec bash "${PROJECT_DIR}/scripts/doctor.sh"
     ;;
   install)
     exec bash "${PROJECT_DIR}/scripts/install.sh"

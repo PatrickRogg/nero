@@ -27,6 +27,8 @@ That means the simplest internet-safe default is:
 
 In self-proxy mode, Nero now uses Traefik file-based routing instead of Docker label discovery to avoid Docker API compatibility nonsense on some VPS setups.
 
+Default deployment mode is `external`, so Nero assumes another proxy handles SSL unless you explicitly set `TRAEFIK_MODE=self` or `TRAEFIK_MODE=auto`.
+
 ## Project layout
 
 ```text
@@ -41,8 +43,10 @@ nero/
     entrypoint.sh
   scripts/
     bootstrap-ubuntu-24.sh
+    doctor.sh
     install.sh
     update.sh
+  templates/workspace/
   workspace/agent/
 ```
 
@@ -99,7 +103,14 @@ Nero supports two install modes automatically:
 - `self`: Nero starts Traefik and manages TLS itself
 - `external`: another proxy already owns `80/443`, so Nero only starts OpenCode on `127.0.0.1:4096`
 
+Default: `external`
+
 When `external` mode is detected, point your existing proxy at `127.0.0.1:4096` for the Nero hostname.
+
+You can also set:
+
+- `TRAEFIK_MODE=self` to force Nero-managed SSL
+- `TRAEFIK_MODE=auto` to let Nero decide based on port usage
 
 ## Commands
 
@@ -107,6 +118,7 @@ Use the repo wrapper command for common tasks:
 
 ```bash
 ./nero bootstrap
+./nero doctor
 ./nero install
 ./nero update
 ```
@@ -115,6 +127,7 @@ After install, the same wrapper is available globally:
 
 ```bash
 nero install
+nero doctor
 nero update
 ```
 
@@ -125,6 +138,26 @@ nero update
 
 If Nero was installed from a git clone, the repo itself is the deployment source.
 That avoids stale copies under `/opt` and keeps `nero update` honest.
+
+## Workspace layout
+
+Nero now scaffolds the agent workspace automatically with:
+
+- `workspace/agent/company-wiki/` for the internal company wiki
+- `workspace/agent/knowledge/` for raw source material
+- `workspace/agent/memory/` for distilled notes and indexes
+- `workspace/agent/output/` for generated deliverables
+- `workspace/agent/code/` for repositories
+- `workspace/agent/.agents/` for agent navigation files, maps, and local skills
+
+Important conventions:
+
+- agents may create additional `.agents/` folders inside subdirectories when local context is useful
+- `workspace/agent/.agents/index.md` acts as the top-level navigation map
+- the company wiki starts with `workspace/agent/company-wiki/_index.md`
+- the memory system starts with `workspace/agent/memory/_index.md`
+
+The style target for future UI and content surfaces should be closer to Notion than Word: clean, lightweight, structured, and calm.
 
 ## GitHub integration
 
@@ -169,6 +202,12 @@ Optional hardening you can add later:
 - Cloudflare Access in front of the domain
 - IP allowlists
 - Fail2ban on the VPS
+
+## SSL note
+
+If Nero reports `Proxy mode: external`, SSL is handled by your existing reverse proxy, not by Nero.
+
+In that mode, a browser warning like `Not secure` usually means the external proxy is serving the hostname without a valid certificate yet. Nero is only listening on `127.0.0.1:4096` and cannot fix TLS from inside the app container.
 
 ## Provider onboarding
 
