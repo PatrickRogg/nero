@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+COMMAND="${1:-help}"
+
+usage() {
+  cat <<'EOF'
+Usage: ./nero <command>
+
+Commands:
+  bootstrap   Prepare a fresh Ubuntu 24.04 VM
+  install     Install or re-install Nero
+  update      Pull latest repo changes and redeploy Nero
+  help        Show this help
+EOF
+}
+
+case "${COMMAND}" in
+  bootstrap)
+    exec bash "${PROJECT_DIR}/scripts/bootstrap-ubuntu-24.sh"
+    ;;
+  install)
+    exec bash "${PROJECT_DIR}/scripts/install.sh"
+    ;;
+  update)
+    git -C "${PROJECT_DIR}" pull --ff-only
+    exec bash "${PROJECT_DIR}/scripts/update.sh"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    printf 'Unknown command: %s\n\n' "${COMMAND}" >&2
+    usage >&2
+    exit 1
+    ;;
+esac

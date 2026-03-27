@@ -41,6 +41,11 @@ compose_up() {
   ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" up -d --build
 }
 
+install_global_command() {
+  ${SUDO} ln -sf "${TARGET_DIR}/nero" /usr/local/bin/nero
+  ${SUDO} chmod +x "${TARGET_DIR}/nero"
+}
+
 prompt_value() {
   local var_name="$1"
   local prompt_text="$2"
@@ -236,6 +241,7 @@ write_env_file
 install_docker
 sync_project
 prepare_runtime_dirs
+install_global_command
 
 compose_up
 
@@ -250,6 +256,7 @@ Proxy mode: ${TRAEFIK_MODE}
 
 Project dir: ${TARGET_DIR}
 Workspace dir: ${TARGET_DIR}/workspace/agent
+Command: nero
 
 If you chose OpenAI subscription auth, open the UI and run /connect.
 Then select OpenAI -> ChatGPT Plus/Pro to finish login in the browser.

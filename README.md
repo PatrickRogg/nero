@@ -8,6 +8,8 @@ Dockerized OpenCode for a VPS with:
 - OpenCode web UI exposed on a custom domain
 - built-in OpenCode HTTP basic auth for both the UI and API
 - persistent agent workspace mounted from the host
+- `zsh` and Oh My Zsh installed on fresh Ubuntu bootstrap
+- global `nero` command installed on the VM
 
 ## Why this setup
 
@@ -26,6 +28,7 @@ That means the simplest internet-safe default is:
 
 ```text
 nero/
+  nero
   compose.yaml
   .env.example
   AGENTS.md
@@ -42,9 +45,9 @@ nero/
 
 ## Quick start
 
-1. On a fresh Ubuntu 24.04 VPS, run `sudo bash ./scripts/bootstrap-ubuntu-24.sh`
+1. On a fresh Ubuntu 24.04 VPS, run `sudo ./nero bootstrap`
 2. Copy `.env.example` to `.env` if you want to prefill infra values
-3. Run `bash ./scripts/install.sh`
+3. Run `./nero install`
 4. Answer the onboarding prompts:
    - domain
    - Let's Encrypt email
@@ -62,6 +65,7 @@ The installer now also:
 - fixes ownership on mounted OpenCode directories automatically
 - detects when ports `80/443` are already in use
 - skips Nero Traefik automatically on boxes that already have another proxy
+- installs the `nero` command into `/usr/local/bin/nero`
 
 ## Fresh Ubuntu 24 VM
 
@@ -71,14 +75,15 @@ If you just cloned the repo onto a clean Ubuntu 24.04 server:
 sudo bash ./scripts/bootstrap-ubuntu-24.sh
 cp .env.example .env
 nano .env
-bash ./scripts/install.sh
+./nero install
 ```
 
 The bootstrap script installs the host dependencies Nero expects:
 
 - Docker Engine
 - Docker Compose plugin
-- git, curl, rsync, nano
+- git, curl, rsync, nano, zsh
+- Oh My Zsh for the invoking non-root user when available
 - UFW with `OpenSSH`, `80/tcp`, and `443/tcp` allowed
 
 ## Proxy modes
@@ -89,6 +94,28 @@ Nero supports two install modes automatically:
 - `external`: another proxy already owns `80/443`, so Nero only starts OpenCode on `127.0.0.1:4096`
 
 When `external` mode is detected, point your existing proxy at `127.0.0.1:4096` for the Nero hostname.
+
+## Commands
+
+Use the repo wrapper command for common tasks:
+
+```bash
+./nero bootstrap
+./nero install
+./nero update
+```
+
+After install, the same wrapper is available globally:
+
+```bash
+nero install
+nero update
+```
+
+`./nero update` does two things:
+
+- pulls the latest repo changes with `git pull --ff-only`
+- rebuilds and restarts Nero with the correct proxy mode
 
 ## One-command install target
 
