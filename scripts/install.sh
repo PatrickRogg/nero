@@ -56,20 +56,12 @@ compose_up() {
 }
 
 remove_managed_containers() {
-  if [[ "${TRAEFIK_MODE}" == "self" ]]; then
-    ${SUDO} docker rm -f "${PROJECT_NAME}-traefik" >/dev/null 2>&1 || true
-  fi
-
+  ${SUDO} docker rm -f "${PROJECT_NAME}-traefik" >/dev/null 2>&1 || true
   ${SUDO} docker rm -f "${PROJECT_NAME}-opencode" >/dev/null 2>&1 || true
 }
 
 compose_down() {
-  if [[ "${TRAEFIK_MODE}" == "self" ]]; then
-    ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy down --remove-orphans || true
-    return
-  fi
-
-  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" down --remove-orphans || true
+  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy down --remove-orphans || true
 }
 
 install_global_command() {
