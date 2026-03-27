@@ -233,7 +233,7 @@ setup_github_auth() {
       printf 'gh CLI is required for GitHub auth setup. Run ./nero bootstrap first.\n' >&2
       exit 1
     fi
-    printf '%s\n' "${GITHUB_TOKEN}" | ${SUDO} env GH_CONFIG_DIR="${gh_config_dir}" gh auth login --hostname github.com --git-protocol https --with-token >/dev/null
+    printf '%s\n' "${GITHUB_TOKEN}" | ${SUDO} env -u GITHUB_TOKEN GH_CONFIG_DIR="${gh_config_dir}" gh auth login --hostname github.com --git-protocol https --with-token >/dev/null
     ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${gh_config_dir}"
   fi
 
