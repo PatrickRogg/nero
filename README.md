@@ -51,8 +51,10 @@ nero/
    - OpenCode login password
    - provider choice
    - model choice
-   - provider API key if needed
+   - auth method for the provider
+   - provider API key only if you choose API-key auth
 5. Open `https://<your-domain>`
+6. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
 
 ## Fresh Ubuntu 24 VM
 
@@ -104,16 +106,19 @@ Current default path:
 
 - provider: OpenAI
 - model: `openai/gpt-5.4`
+- auth: ChatGPT Plus/Pro subscription via `/connect`
 
 Why this default:
 
 - Default to the newest OpenAI model for the shortest high-quality setup path
-- OpenCode's built-in OpenAI provider works directly with Codex-capable models
-- for a headless VPS install, prompting once for an OpenAI API key is the shortest usable setup flow
+- OpenCode supports OpenAI account auth via `/connect` using `ChatGPT Plus/Pro`
+- provider credentials are stored by OpenCode in persistent auth storage instead of forcing an API key into `.env`
+- API keys still work, but subscription auth is the cleaner default when you already have the Codex/ChatGPT plan
 
 The installer currently supports:
 
-- OpenAI
+- OpenAI subscription auth
+- OpenAI API key
 - Anthropic
 - OpenRouter
 
@@ -138,6 +143,7 @@ The future admin service for integrations and permissions should be added as a s
 
 - The container starts OpenCode in `/workspace/agent`
 - The default model is configured from installer onboarding via `OPENCODE_MODEL`
+- OpenCode provider credentials from `/connect` are persisted in the mounted data directory
 - `AGENTS.md` gives the instance a default personality inspired by OpenClaw's `SOUL.md` style
 - The default OpenCode permissions config is conservative and asks before sensitive actions
 - SSL uses the Cloudflare DNS challenge, so certificate renewal stays automatic

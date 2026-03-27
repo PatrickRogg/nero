@@ -65,6 +65,7 @@ prompt_provider_setup() {
   local provider_choice=""
   local current_model=""
   local model_input=""
+  local openai_auth_choice=""
 
   printf '\n'
   printf 'Choose initial model provider:\n'
@@ -79,7 +80,22 @@ prompt_provider_setup() {
       current_model="${OPENCODE_MODEL:-$DEFAULT_MODEL}"
       read -r -p "Model [${current_model}]: " model_input
       OPENCODE_MODEL="${model_input:-$current_model}"
-      prompt_value OPENAI_API_KEY "OpenAI API key" true
+      printf 'OpenAI auth method:\n'
+      printf '  1) ChatGPT Plus/Pro subscription via /connect (recommended)\n'
+      printf '  2) API key\n'
+      read -r -p 'Auth [1]: ' openai_auth_choice
+      case "${openai_auth_choice:-1}" in
+        1)
+          OPENAI_API_KEY=""
+          ;;
+        2)
+          prompt_value OPENAI_API_KEY "OpenAI API key" true
+          ;;
+        *)
+          printf 'Invalid OpenAI auth selection.\n' >&2
+          exit 1
+          ;;
+      esac
       ;;
     2)
       clear_unused_provider_envs anthropic
@@ -194,5 +210,8 @@ Model: ${OPENCODE_MODEL}
 
 Project dir: ${TARGET_DIR}
 Workspace dir: ${TARGET_DIR}/workspace/agent
+
+If you chose OpenAI subscription auth, open the UI and run /connect.
+Then select OpenAI -> ChatGPT Plus/Pro to finish login in the browser.
 
 EOF
