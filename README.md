@@ -33,6 +33,7 @@ nero/
     Dockerfile
     entrypoint.sh
   scripts/
+    bootstrap-ubuntu-24.sh
     install.sh
     update.sh
   workspace/agent/
@@ -40,9 +41,10 @@ nero/
 
 ## Quick start
 
-1. Optionally copy `.env.example` to `.env` if you want to prefill infra values
-2. Run `bash ./scripts/install.sh`
-3. Answer the onboarding prompts:
+1. On a fresh Ubuntu 24.04 VPS, run `sudo bash ./scripts/bootstrap-ubuntu-24.sh`
+2. Copy `.env.example` to `.env` if you want to prefill infra values
+3. Run `bash ./scripts/install.sh`
+4. Answer the onboarding prompts:
    - domain
    - Let's Encrypt email
    - Cloudflare DNS token
@@ -50,7 +52,25 @@ nero/
    - provider choice
    - model choice
    - provider API key if needed
-4. Open `https://<your-domain>`
+5. Open `https://<your-domain>`
+
+## Fresh Ubuntu 24 VM
+
+If you just cloned the repo onto a clean Ubuntu 24.04 server:
+
+```bash
+sudo bash ./scripts/bootstrap-ubuntu-24.sh
+cp .env.example .env
+nano .env
+bash ./scripts/install.sh
+```
+
+The bootstrap script installs the host dependencies Nero expects:
+
+- Docker Engine
+- Docker Compose plugin
+- git, curl, rsync, nano
+- UFW with `OpenSSH`, `80/tcp`, and `443/tcp` allowed
 
 ## One-command install target
 
