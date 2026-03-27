@@ -49,7 +49,7 @@ nero/
 1. On a fresh Ubuntu 24.04 VPS, run `sudo ./nero bootstrap`
 2. Copy `.env.example` to `.env` if you want to prefill infra values
 3. Run `./nero install`
-4. Answer the onboarding prompts:
+4. Answer only the missing onboarding prompts:
    - domain
    - Let's Encrypt email
    - Cloudflare DNS token
@@ -66,6 +66,7 @@ The installer now also:
 - installs the `nero` command into `/usr/local/bin/nero`
 - prepares `gh`, git identity, and SSH material for GitHub workflows
 - reuses values already present in `.env` instead of asking every time
+- writes shell-safe `.env` values so names with spaces do not break reinstall
 
 ## Fresh Ubuntu 24 VM
 
