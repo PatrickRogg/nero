@@ -13,7 +13,8 @@ RUN apt-get update \
 
 RUN npm install -g opencode-ai@latest
 
-RUN useradd --create-home --shell /bin/bash opencode
+RUN groupadd --gid 1000 opencode \
+    && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash opencode
 
 COPY entrypoint.sh /usr/local/bin/nero-entrypoint
 RUN chmod +x /usr/local/bin/nero-entrypoint

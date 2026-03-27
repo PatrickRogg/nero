@@ -2,7 +2,8 @@
 
 Dockerized OpenCode for a VPS with:
 
-- Traefik reverse proxy
+- Traefik reverse proxy when Nero owns `80/443`
+- automatic fallback for boxes that already have a reverse proxy
 - automatic Let's Encrypt SSL via Cloudflare DNS challenge
 - OpenCode web UI exposed on a custom domain
 - built-in OpenCode HTTP basic auth for both the UI and API
@@ -17,7 +18,7 @@ Current OpenCode docs support protecting `opencode serve` and `opencode web` wit
 
 That means the simplest internet-safe default is:
 
-1. Traefik handles TLS and renewal
+1. Nero uses Traefik when the VM owns ports `80/443`, otherwise it reuses the existing reverse proxy
 2. OpenCode handles UI and API password protection
 3. The agent only sees its dedicated workspace mount
 
@@ -56,6 +57,12 @@ nero/
 5. Open `https://<your-domain>`
 6. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
 
+The installer now also:
+
+- fixes ownership on mounted OpenCode directories automatically
+- detects when ports `80/443` are already in use
+- skips Nero Traefik automatically on boxes that already have another proxy
+
 ## Fresh Ubuntu 24 VM
 
 If you just cloned the repo onto a clean Ubuntu 24.04 server:
@@ -73,6 +80,15 @@ The bootstrap script installs the host dependencies Nero expects:
 - Docker Compose plugin
 - git, curl, rsync, nano
 - UFW with `OpenSSH`, `80/tcp`, and `443/tcp` allowed
+
+## Proxy modes
+
+Nero supports two install modes automatically:
+
+- `self`: Nero starts Traefik and manages TLS itself
+- `external`: another proxy already owns `80/443`, so Nero only starts OpenCode on `127.0.0.1:4096`
+
+When `external` mode is detected, point your existing proxy at `127.0.0.1:4096` for the Nero hostname.
 
 ## One-command install target
 
@@ -144,6 +160,7 @@ The future admin service for integrations and permissions should be added as a s
 - The container starts OpenCode in `/workspace/agent`
 - The default model is configured from installer onboarding via `OPENCODE_MODEL`
 - OpenCode provider credentials from `/connect` are persisted in the mounted data directory
+- Mounted config/data/workspace directories are auto-owned by the `opencode` container user during install
 - `AGENTS.md` gives the instance a default personality inspired by OpenClaw's `SOUL.md` style
 - The default OpenCode permissions config is conservative and asks before sensitive actions
 - SSL uses the Cloudflare DNS challenge, so certificate renewal stays automatic

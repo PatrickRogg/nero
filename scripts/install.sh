@@ -6,6 +6,8 @@ TARGET_DIR="${TARGET_DIR:-/opt/${PROJECT_NAME}}"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 DEFAULT_MODEL="openai/gpt-5.4"
+OPENCODE_UID="1000"
+OPENCODE_GID="1000"
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""
@@ -15,6 +17,28 @@ fi
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+port_in_use() {
+  local port="$1"
+  ss -tuln | grep -Eq ":${port}[[:space:]]"
+}
+
+detect_proxy_mode() {
+  if port_in_use 80 || port_in_use 443; then
+    TRAEFIK_MODE="external"
+  else
+    TRAEFIK_MODE="self"
+  fi
+}
+
+compose_up() {
+  if [[ "${TRAEFIK_MODE}" == "self" ]]; then
+    ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy up -d --build
+    return
+  fi
+
+  ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" up -d --build
 }
 
 prompt_value() {
@@ -122,6 +146,8 @@ write_env_file() {
   cat > "${SOURCE_DIR}/.env" <<EOF
 PROJECT_NAME=${PROJECT_NAME}
 TZ=${TZ:-UTC}
+TRAEFIK_MODE=${TRAEFIK_MODE}
+OPENCODE_BIND_PORT=${OPENCODE_BIND_PORT:-4096}
 
 OPENCODE_DOMAIN=${OPENCODE_DOMAIN}
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
@@ -176,6 +202,10 @@ prepare_runtime_dirs() {
 
   ${SUDO} touch "${TARGET_DIR}/data/traefik/acme.json"
   ${SUDO} chmod 600 "${TARGET_DIR}/data/traefik/acme.json"
+  ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" \
+    "${TARGET_DIR}/config/opencode" \
+    "${TARGET_DIR}/data/opencode" \
+    "${TARGET_DIR}/workspace/agent"
 }
 
 if [[ -f "${SOURCE_DIR}/.env" ]]; then
@@ -184,13 +214,22 @@ if [[ -f "${SOURCE_DIR}/.env" ]]; then
   set +a
 fi
 
+detect_proxy_mode
+
 prompt_value OPENCODE_DOMAIN "OpenCode domain"
-prompt_value LETSENCRYPT_EMAIL "Let's Encrypt email"
-prompt_value CF_DNS_API_TOKEN "Cloudflare DNS API token" true
 prompt_value OPENCODE_SERVER_PASSWORD "OpenCode server password" true
+
+if [[ "${TRAEFIK_MODE}" == "self" ]]; then
+  prompt_value LETSENCRYPT_EMAIL "Let's Encrypt email"
+  prompt_value CF_DNS_API_TOKEN "Cloudflare DNS API token" true
+else
+  LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL:-}"
+  CF_DNS_API_TOKEN="${CF_DNS_API_TOKEN:-}"
+fi
 
 OPENCODE_SERVER_USERNAME="${OPENCODE_SERVER_USERNAME:-opencode}"
 TZ="${TZ:-UTC}"
+OPENCODE_BIND_PORT="${OPENCODE_BIND_PORT:-4096}"
 prompt_provider_setup
 
 write_env_file
@@ -198,7 +237,7 @@ install_docker
 sync_project
 prepare_runtime_dirs
 
-${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" up -d --build
+compose_up
 
 cat <<EOF
 
@@ -207,6 +246,7 @@ nero is installed.
 URL: https://${OPENCODE_DOMAIN}
 Username: ${OPENCODE_SERVER_USERNAME}
 Model: ${OPENCODE_MODEL}
+Proxy mode: ${TRAEFIK_MODE}
 
 Project dir: ${TARGET_DIR}
 Workspace dir: ${TARGET_DIR}/workspace/agent
@@ -215,3 +255,13 @@ If you chose OpenAI subscription auth, open the UI and run /connect.
 Then select OpenAI -> ChatGPT Plus/Pro to finish login in the browser.
 
 EOF
+
+if [[ "${TRAEFIK_MODE}" == "external" ]]; then
+  cat <<EOF
+
+Detected an existing reverse proxy on ports 80/443.
+Nero started without its own Traefik and is listening on 127.0.0.1:${OPENCODE_BIND_PORT}.
+Point your existing proxy at that local port for ${OPENCODE_DOMAIN}.
+
+EOF
+fi
