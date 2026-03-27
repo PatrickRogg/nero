@@ -94,84 +94,13 @@ prompt_value() {
   printf -v "$var_name" '%s' "$current_value"
 }
 
-clear_unused_provider_envs() {
-  local selected_provider="$1"
-
-  case "${selected_provider}" in
-    openai)
-      ANTHROPIC_API_KEY=""
-      OPENROUTER_API_KEY=""
-      ;;
-    anthropic)
-      OPENAI_API_KEY=""
-      OPENROUTER_API_KEY=""
-      ;;
-    openrouter)
-      OPENAI_API_KEY=""
-      ANTHROPIC_API_KEY=""
-      ;;
-  esac
-
-  GEMINI_API_KEY=""
-  GITHUB_TOKEN=""
-  LOCAL_ENDPOINT=""
-}
-
-prompt_provider_setup() {
-  local provider_choice=""
-  local current_model=""
-  local model_input=""
-  local openai_auth_choice=""
-
-  printf '\n'
-  printf 'Choose initial model provider:\n'
-  printf '  1) OpenAI (recommended, GPT 5.4)\n'
-  printf '  2) Anthropic\n'
-  printf '  3) OpenRouter\n'
-  read -r -p 'Provider [1]: ' provider_choice
-
-  case "${provider_choice:-1}" in
-    1)
-      clear_unused_provider_envs openai
-      current_model="${OPENCODE_MODEL:-$DEFAULT_MODEL}"
-      read -r -p "Model [${current_model}]: " model_input
-      OPENCODE_MODEL="${model_input:-$current_model}"
-      printf 'OpenAI auth method:\n'
-      printf '  1) ChatGPT Plus/Pro subscription via /connect (recommended)\n'
-      printf '  2) API key\n'
-      read -r -p 'Auth [1]: ' openai_auth_choice
-      case "${openai_auth_choice:-1}" in
-        1)
-          OPENAI_API_KEY=""
-          ;;
-        2)
-          prompt_value OPENAI_API_KEY "OpenAI API key" true
-          ;;
-        *)
-          printf 'Invalid OpenAI auth selection.\n' >&2
-          exit 1
-          ;;
-      esac
-      ;;
-    2)
-      clear_unused_provider_envs anthropic
-      current_model="${OPENCODE_MODEL:-anthropic/claude-sonnet-4-5}"
-      read -r -p "Model [${current_model}]: " model_input
-      OPENCODE_MODEL="${model_input:-$current_model}"
-      prompt_value ANTHROPIC_API_KEY "Anthropic API key" true
-      ;;
-    3)
-      clear_unused_provider_envs openrouter
-      current_model="${OPENCODE_MODEL:-openrouter/openai/gpt-5.4}"
-      read -r -p "Model [${current_model}]: " model_input
-      OPENCODE_MODEL="${model_input:-$current_model}"
-      prompt_value OPENROUTER_API_KEY "OpenRouter API key" true
-      ;;
-    *)
-      printf 'Invalid provider selection.\n' >&2
-      exit 1
-      ;;
-  esac
+set_model_defaults() {
+  OPENCODE_MODEL="${OPENCODE_MODEL:-$DEFAULT_MODEL}"
+  ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
+  OPENAI_API_KEY="${OPENAI_API_KEY:-}"
+  GEMINI_API_KEY="${GEMINI_API_KEY:-}"
+  OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
+  LOCAL_ENDPOINT="${LOCAL_ENDPOINT:-}"
 }
 
 write_gitconfig() {
@@ -192,6 +121,7 @@ EOF
 setup_github_auth() {
   local gh_config_dir="${TARGET_DIR}/config/gh"
   local github_auth_choice=""
+  local gh_hosts_file="${gh_config_dir}/hosts.yml"
 
   if [[ "${ENABLE_GITHUB}" != "yes" ]]; then
     GITHUB_TOKEN=""
@@ -203,24 +133,26 @@ setup_github_auth() {
   prompt_value GIT_USER_NAME "Git author name"
   prompt_value GIT_USER_EMAIL "Git author email"
 
-  printf '\n'
-  printf 'GitHub auth method:\n'
-  printf '  1) Fine-grained token (recommended)\n'
-  printf '  2) Skip token for now\n'
-  read -r -p 'Auth [1]: ' github_auth_choice
+  if [[ -z "${GITHUB_TOKEN:-}" && ! -f "${gh_hosts_file}" ]]; then
+    printf '\n'
+    printf 'GitHub auth method:\n'
+    printf '  1) Fine-grained token (recommended)\n'
+    printf '  2) Skip token for now\n'
+    read -r -p 'Auth [1]: ' github_auth_choice
 
-  case "${github_auth_choice:-1}" in
-    1)
-      prompt_value GITHUB_TOKEN "GitHub token" true
-      ;;
-    2)
-      GITHUB_TOKEN=""
-      ;;
-    *)
-      printf 'Invalid GitHub auth selection.\n' >&2
-      exit 1
-      ;;
-  esac
+    case "${github_auth_choice:-1}" in
+      1)
+        prompt_value GITHUB_TOKEN "GitHub token" true
+        ;;
+      2)
+        GITHUB_TOKEN=""
+        ;;
+      *)
+        printf 'Invalid GitHub auth selection.\n' >&2
+        exit 1
+        ;;
+    esac
+  fi
 
   prompt_yes_no GITHUB_SSH_KEY "Generate GitHub SSH key for this VM? [Y/n]" "y"
 
@@ -253,6 +185,8 @@ PROJECT_NAME=${PROJECT_NAME}
 TZ=${TZ:-UTC}
 TRAEFIK_MODE=${TRAEFIK_MODE}
 OPENCODE_BIND_PORT=${OPENCODE_BIND_PORT:-4096}
+ENABLE_GITHUB=${ENABLE_GITHUB:-yes}
+GITHUB_SSH_KEY=${GITHUB_SSH_KEY:-yes}
 
 OPENCODE_DOMAIN=${OPENCODE_DOMAIN}
 LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
@@ -261,6 +195,8 @@ CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
 OPENCODE_SERVER_USERNAME=${OPENCODE_SERVER_USERNAME:-opencode}
 OPENCODE_SERVER_PASSWORD=${OPENCODE_SERVER_PASSWORD}
 OPENCODE_MODEL=${OPENCODE_MODEL}
+GIT_USER_NAME=${GIT_USER_NAME:-}
+GIT_USER_EMAIL=${GIT_USER_EMAIL:-}
 
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -308,6 +244,10 @@ prepare_runtime_dirs() {
     "${TARGET_DIR}/data/traefik" \
     "${TARGET_DIR}/workspace/agent"
 
+  if [[ -d "${TARGET_DIR}/config/git/.gitconfig" ]]; then
+    ${SUDO} rm -rf "${TARGET_DIR}/config/git/.gitconfig"
+  fi
+
   ${SUDO} touch "${TARGET_DIR}/data/traefik/acme.json"
   ${SUDO} touch "${TARGET_DIR}/config/git/.gitconfig"
   ${SUDO} chmod 600 "${TARGET_DIR}/data/traefik/acme.json"
@@ -344,7 +284,7 @@ fi
 OPENCODE_SERVER_USERNAME="${OPENCODE_SERVER_USERNAME:-opencode}"
 TZ="${TZ:-UTC}"
 OPENCODE_BIND_PORT="${OPENCODE_BIND_PORT:-4096}"
-prompt_provider_setup
+set_model_defaults
 prompt_yes_no ENABLE_GITHUB "Enable GitHub integration for repos and PRs? [Y/n]" "y"
 
 install_docker

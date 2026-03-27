@@ -54,11 +54,7 @@ nero/
    - Let's Encrypt email
    - Cloudflare DNS token
    - OpenCode login password
-   - provider choice
-   - model choice
-   - auth method for the provider
-   - provider API key only if you choose API-key auth
-   - GitHub integration and auth details
+   - GitHub integration and auth details, only when missing from `.env`
 5. Open `https://<your-domain>`
 6. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
 
@@ -69,6 +65,7 @@ The installer now also:
 - skips Nero Traefik automatically on boxes that already have another proxy
 - installs the `nero` command into `/usr/local/bin/nero`
 - prepares `gh`, git identity, and SSH material for GitHub workflows
+- reuses values already present in `.env` instead of asking every time
 
 ## Fresh Ubuntu 24 VM
 
@@ -167,6 +164,10 @@ Optional hardening you can add later:
 ## Provider onboarding
 
 The installer handles provider and model setup interactively so `.env.example` can stay minimal.
+
+Nero now defaults to OpenAI subscription auth with `openai/gpt-5.4` and only
+prompts for missing install values. If `.env` already contains domain, auth,
+and GitHub settings, rerunning install should be quiet.
 
 Current default path:
 
