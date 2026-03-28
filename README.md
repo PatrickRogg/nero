@@ -46,6 +46,7 @@ nero/
     doctor.sh
     install.sh
     update.sh
+    workspace-setup.sh.example
   templates/workspace/
   workspace/agents/   # created on install (gitignored)
 ```
@@ -160,6 +161,18 @@ Important conventions:
 - Nested `.agents/` folders are fine when a subdirectory needs local context.
 - `nero install` migrates a legacy `workspace/agent/` directory to `workspace/agents/` if present.
 - The style target for future UI and content surfaces should be closer to Notion than Word: clean, lightweight, structured, and calm.
+
+### Custom workspace setup
+
+After the workspace template is applied and GitHub or git identity is configured, the installer runs an **optional** hook so you can clone repos, download data, or run other idempotent steps:
+
+| Mechanism | Description |
+|-----------|-------------|
+| Default path | `scripts/workspace-setup.sh` in the Nero project directory (must exist; otherwise the step is skipped) |
+| Override | Set `WORKSPACE_SETUP_SCRIPT` in `.env` to an absolute path to your script |
+| Skip | Set `SKIP_WORKSPACE_SETUP=1` in `.env` |
+
+Copy `scripts/workspace-setup.sh.example` to `scripts/workspace-setup.sh`, make it executable (`chmod +x`), and edit. The script runs as the same UID as the OpenCode workspace (default `1000`), with `WORKSPACE_ROOT`, `NERO_PROJECT_DIR`, `NERO_SOURCE_DIR`, `NERO_SSH_DIR`, `GH_CONFIG_DIR`, and git-related env vars set when available. It runs on every `nero install` and `nero update`, so keep it safe to re-run (e.g. `git pull` in existing clones rather than always `git clone` into a fresh path).
 
 ## GitHub integration
 

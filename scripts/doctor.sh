@@ -19,6 +19,13 @@ printf '\nContainers\n'
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | (grep -E 'NAMES|opencode|traefik' || true)
 
 printf '\nWorkspace\n'
+if [[ -f "${PROJECT_DIR}/scripts/workspace-setup.sh" ]]; then
+  printf 'ok  workspace-setup hook: %s\n' "${PROJECT_DIR}/scripts/workspace-setup.sh"
+elif [[ -n "${WORKSPACE_SETUP_SCRIPT:-}" ]] && [[ -f "${WORKSPACE_SETUP_SCRIPT}" ]]; then
+  printf 'ok  workspace-setup hook: %s (from WORKSPACE_SETUP_SCRIPT)\n' "${WORKSPACE_SETUP_SCRIPT}"
+else
+  printf 'info workspace-setup.sh not present (optional; see workspace-setup.sh.example)\n'
+fi
 for path in \
   "${PROJECT_DIR}/workspace/agents/drop" \
   "${PROJECT_DIR}/workspace/agents/knowledge" \

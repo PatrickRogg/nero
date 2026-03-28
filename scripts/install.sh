@@ -164,6 +164,68 @@ initialize_workspace_structure() {
   ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${workspace_root}"
 }
 
+run_workspace_setup() {
+  if [[ "${SKIP_WORKSPACE_SETUP:-}" == "1" ]]; then
+    printf 'Skipping workspace setup (SKIP_WORKSPACE_SETUP=1).\n'
+    return
+  fi
+
+  local workspace_root="${TARGET_DIR}/workspace/agents"
+  local script_path="${WORKSPACE_SETUP_SCRIPT:-${TARGET_DIR}/scripts/workspace-setup.sh}"
+
+  [[ -f "${script_path}" ]] || return 0
+
+  printf '\nRunning workspace setup script: %s\n' "${script_path}"
+
+  local git_config_global="${TARGET_DIR}/config/git/.gitconfig"
+  local ssh_dir="${TARGET_DIR}/config/ssh"
+  local gh_config_dir="${TARGET_DIR}/config/gh"
+
+  local -a envargs=(
+    WORKSPACE_ROOT="${workspace_root}"
+    NERO_PROJECT_DIR="${TARGET_DIR}"
+    NERO_SOURCE_DIR="${SOURCE_DIR}"
+    NERO_SSH_DIR="${ssh_dir}"
+    NERO_GIT_CONFIG="${git_config_global}"
+    GH_CONFIG_DIR="${gh_config_dir}"
+    PATH="${PATH}"
+    HOME="${workspace_root}"
+  )
+  if [[ -f "${git_config_global}" ]]; then
+    envargs+=(GIT_CONFIG_GLOBAL="${git_config_global}")
+  fi
+  if [[ -f "${ssh_dir}/id_ed25519" ]]; then
+    envargs+=(GIT_SSH_COMMAND="ssh -i ${ssh_dir}/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new")
+  fi
+
+  local -a runas=()
+  if getent passwd "${OPENCODE_UID}" >/dev/null 2>&1; then
+    if [[ "${EUID}" -eq "${OPENCODE_UID}" ]]; then
+      runas=()
+    elif command -v sudo >/dev/null 2>&1; then
+      runas=(sudo -u "#${OPENCODE_UID}")
+    else
+      printf 'Warning: sudo not found; running workspace setup as the invoking user.\n' >&2
+    fi
+  else
+    printf 'Warning: no passwd entry for UID %s; running workspace setup as the invoking user.\n' "${OPENCODE_UID}" >&2
+  fi
+
+  "${runas[@]}" env "${envargs[@]}" \
+    bash -s -- "${script_path}" <<'EOS'
+set -euo pipefail
+cd "${WORKSPACE_ROOT}"
+script="$1"
+if [[ -x "${script}" ]]; then
+  exec "${script}"
+else
+  exec bash "${script}"
+fi
+EOS
+
+  ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${workspace_root}"
+}
+
 prompt_yes_no() {
   local var_name="$1"
   local prompt_text="$2"
@@ -359,6 +421,9 @@ GEMINI_API_KEY=$(shell_escape "${GEMINI_API_KEY:-}")
 OPENROUTER_API_KEY=$(shell_escape "${OPENROUTER_API_KEY:-}")
 GITHUB_TOKEN=$(shell_escape "${GITHUB_TOKEN:-}")
 LOCAL_ENDPOINT=$(shell_escape "${LOCAL_ENDPOINT:-}")
+
+WORKSPACE_SETUP_SCRIPT=$(shell_escape "${WORKSPACE_SETUP_SCRIPT:-}")
+SKIP_WORKSPACE_SETUP=$(shell_escape "${SKIP_WORKSPACE_SETUP:-}")
 EOF
 
   if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" ]]; then
@@ -470,6 +535,7 @@ resolve_git_identity
 setup_github_auth
 write_gitconfig
 apply_host_git_identity
+run_workspace_setup
 write_env_file
 write_traefik_dynamic_config
 install_global_command

@@ -20,6 +20,8 @@ You are my personal AI assistant running on a Hetzner VM. I interact with you vi
 
 You may create additional files under `memory/` as needed.
 
+On the **Nero host** (not inside this tree), optional `scripts/workspace-setup.sh` in the Nero repo runs on `nero install` / `nero update` to clone repos or seed `drop/` — see the Nero README.
+
 ## Two-tier knowledge system
 
 You have two layers of knowledge:
