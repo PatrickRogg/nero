@@ -15,6 +15,8 @@ if [[ -f "${PROJECT_DIR}/.env" ]]; then
   set +a
 fi
 
+WORKSPACE_ROOT="${WORKSPACE_HOST_DIR:-${PROJECT_DIR}/workspace/agents}"
+
 compose_config_hash() {
   sha256sum "${PROJECT_DIR}/compose.yaml" "${PROJECT_DIR}/.env" 2>/dev/null | sha256sum | awk '{print $1}'
 }
@@ -34,6 +36,7 @@ printf 'Project dir: %s\n' "${PROJECT_DIR}"
 printf 'Proxy mode: %s\n' "${TRAEFIK_MODE:-self}"
 printf 'Domain: %s\n' "${OPENCODE_DOMAIN:-unset}"
 printf 'Bind port: %s\n' "${OPENCODE_BIND_PORT:-4096}"
+printf 'Workspace dir: %s\n' "${WORKSPACE_ROOT}"
 
 stamp_path="${PROJECT_DIR}/data/.nero-compose-signature"
 current_hash="$(compose_config_hash)"
@@ -64,22 +67,15 @@ printf '\nContainers\n'
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | (grep -E 'NAMES|opencode|traefik' || true)
 
 printf '\nWorkspace\n'
-if [[ -f "${PROJECT_DIR}/scripts/workspace-setup.sh" ]]; then
-  printf 'ok  workspace-setup hook: %s\n' "${PROJECT_DIR}/scripts/workspace-setup.sh"
-elif [[ -n "${WORKSPACE_SETUP_SCRIPT:-}" ]] && [[ -f "${WORKSPACE_SETUP_SCRIPT}" ]]; then
-  printf 'ok  workspace-setup hook: %s (from WORKSPACE_SETUP_SCRIPT)\n' "${WORKSPACE_SETUP_SCRIPT}"
-else
-  printf 'info workspace-setup.sh not present (optional; see workspace-setup.sh.example)\n'
-fi
 for path in \
-  "${PROJECT_DIR}/workspace/agents/drop" \
-  "${PROJECT_DIR}/workspace/agents/knowledge" \
-  "${PROJECT_DIR}/workspace/agents/memory" \
-  "${PROJECT_DIR}/workspace/agents/output" \
-  "${PROJECT_DIR}/workspace/agents/code" \
-  "${PROJECT_DIR}/workspace/agents/scripts" \
-  "${PROJECT_DIR}/workspace/agents/.agents" \
-  "${PROJECT_DIR}/workspace/agents/agents"; do
+  "${WORKSPACE_ROOT}/drop" \
+  "${WORKSPACE_ROOT}/knowledge" \
+  "${WORKSPACE_ROOT}/memory" \
+  "${WORKSPACE_ROOT}/output" \
+  "${WORKSPACE_ROOT}/code" \
+  "${WORKSPACE_ROOT}/scripts" \
+  "${WORKSPACE_ROOT}/.agents" \
+  "${WORKSPACE_ROOT}/agents"; do
   if [[ -e "${path}" ]]; then
     printf 'ok  %s\n' "${path}"
   else

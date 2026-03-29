@@ -46,9 +46,8 @@ nero/
     doctor.sh
     install.sh
     update.sh
-    workspace-setup.sh.example
   templates/workspace/
-  workspace/agents/   # created on install (gitignored)
+  # agent workspace is created in the installing user's home directory
 ```
 
 ## Quick start
@@ -71,7 +70,6 @@ The installer now also:
 - skips Nero Traefik automatically on boxes that already have another proxy
 - installs the `nero` command into `/usr/local/bin/nero`
 - prepares `gh`, git identity, and SSH material for GitHub workflows
-- runs a local host init script after VM dependencies are installed and the project files are refreshed
 - reuses values already present in `.env` instead of asking every time
 - writes shell-safe `.env` values so names with spaces do not break reinstall
 - installs into `/opt/nero` by default and refreshes that directory during updates
@@ -146,7 +144,7 @@ If you are developing Nero itself, local repo commands still work:
 
 ## Workspace layout
 
-Defaults live in `templates/workspace/` and are copied into `workspace/agents/` on install (`cp -an`, so your files are never overwritten).
+Defaults live in `templates/workspace/` and are copied into the host workspace on install (`~/agents` by default, using `cp -an` so your files are never overwritten).
 
 | Path | Purpose |
 |------|---------|
@@ -163,20 +161,8 @@ Defaults live in `templates/workspace/` and are copied into `workspace/agents/` 
 Important conventions:
 
 - Nested `.agents/` folders are fine when a subdirectory needs local context.
-- `nero install` migrates a legacy `workspace/agent/` directory to `workspace/agents/` if present.
+- `nero install` migrates a legacy `workspace/agent/` or `workspace/agents/` directory from inside the Nero project into the host workspace if present.
 - The style target for future UI and content surfaces should be closer to Notion than Word: clean, lightweight, structured, and calm.
-
-### Custom workspace setup
-
-After the workspace template is applied and GitHub or git identity is configured, the installer runs an **optional** hook so you can sync repos, download data, or run other idempotent steps:
-
-| Mechanism | Description |
-|-----------|-------------|
-| Default path | `scripts/workspace-setup.sh` in the Nero project directory (must exist; otherwise the step is skipped) |
-| Override | Set `WORKSPACE_SETUP_SCRIPT` in `.env` to an absolute path to your script |
-| Skip | Set `SKIP_WORKSPACE_SETUP=1` in `.env` |
-
-Copy `scripts/workspace-setup.sh.example` to `scripts/workspace-setup.sh`, make it executable (`chmod +x`), and edit. The script runs as the same UID as the OpenCode workspace (default `1000`), with `WORKSPACE_ROOT`, `NERO_PROJECT_DIR`, `NERO_SOURCE_DIR`, `NERO_SSH_DIR`, `GH_CONFIG_DIR`, and git-related env vars set when available. It runs on every `nero install` and `nero update`, so keep it safe to re-run (for example, `git pull` in an existing clone instead of recreating it every time).
 
 ## GitHub integration
 
@@ -256,17 +242,6 @@ The installer currently supports:
 - Anthropic
 - OpenRouter
 
-## Host init script
-
-Nero tracks `scripts/init-host.example.sh` and creates a local
-`scripts/init-host.local.sh` when you want machine-specific setup.
-
-- `scripts/init-host.local.sh` is gitignored, so VM-specific edits stay out of git
-- copy or rename `scripts/init-host.example.sh` to `scripts/init-host.local.sh` to enable it
-- it runs during `nero install` and `nero update` before containers are recreated
-- use it for machine-local setup that should happen after Docker and other VM deps are ready
-- Nero exports `TARGET_DIR`, `SOURCE_DIR`, and `PROJECT_NAME` to the script
-
 ## Domains
 
 This initial scaffold exposes one hostname:
@@ -282,7 +257,7 @@ The future admin service for integrations and permissions should be added as a s
 - OpenCode config: `config/opencode/`
 - OpenCode data: `data/opencode/`
 - Traefik ACME data: `data/traefik/`
-- Agent workspace: `workspace/agents/`
+- Agent workspace: `~/agents/` by default (`WORKSPACE_HOST_DIR` overrides it)
 
 ## Notes
 
@@ -290,6 +265,6 @@ The future admin service for integrations and permissions should be added as a s
 - The default model is configured from installer onboarding via `OPENCODE_MODEL`
 - OpenCode provider credentials from `/connect` are persisted in the mounted data directory
 - Mounted config/data/workspace directories are auto-owned by the `opencode` container user during install
-- `AGENTS.md` gives the instance a default personality; `workspace/agents/.agents/SOUL.md` holds voice and values for the workspace
+- `AGENTS.md` gives the instance a default personality; `~/agents/.agents/SOUL.md` holds voice and values for the workspace by default
 - OpenCode permissions default to allow (no approval prompts); adjust `config/opencode/opencode.json` if you want stricter gates
 - SSL uses the Cloudflare DNS challenge, so certificate renewal stays automatic

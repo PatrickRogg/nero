@@ -17,7 +17,6 @@ fi
 DEFAULT_MODEL="openai/gpt-5.4"
 OPENCODE_UID="1000"
 OPENCODE_GID="1000"
-INIT_SCRIPT_LOCAL_RELATIVE_PATH="scripts/init-host.local.sh"
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""
@@ -31,6 +30,29 @@ need_cmd() {
 
 shell_escape() {
   printf '%q' "$1"
+}
+
+resolve_workspace_host_dir() {
+  if [[ -n "${WORKSPACE_HOST_DIR:-}" ]]; then
+    return
+  fi
+
+  local install_user="${SUDO_USER:-${USER:-}}"
+  local install_home=""
+
+  if [[ -n "${install_user}" ]]; then
+    install_home="$(getent passwd "${install_user}" 2>/dev/null | cut -d: -f6 || true)"
+  fi
+
+  if [[ -z "${install_home}" ]]; then
+    install_home="${HOME:-}"
+  fi
+
+  if [[ -z "${install_home}" ]]; then
+    install_home="/root"
+  fi
+
+  WORKSPACE_HOST_DIR="${install_home}/agents"
 }
 
 port_in_use() {
@@ -158,15 +180,26 @@ EOF
 }
 
 migrate_legacy_agent_workspace() {
-  local base="${TARGET_DIR}/workspace"
-  if [[ -d "${base}/agent" && ! -d "${base}/agents" ]]; then
-    ${SUDO} mv "${base}/agent" "${base}/agents"
+  local legacy_agents="${TARGET_DIR}/workspace/agents"
+  local legacy_agent="${TARGET_DIR}/workspace/agent"
+  local workspace_parent
+
+  workspace_parent="$(dirname "${WORKSPACE_HOST_DIR}")"
+  ${SUDO} mkdir -p "${workspace_parent}"
+
+  if [[ -d "${legacy_agents}" && ! -e "${WORKSPACE_HOST_DIR}" ]]; then
+    ${SUDO} mv "${legacy_agents}" "${WORKSPACE_HOST_DIR}"
+    return
+  fi
+
+  if [[ -d "${legacy_agent}" && ! -e "${WORKSPACE_HOST_DIR}" ]]; then
+    ${SUDO} mv "${legacy_agent}" "${WORKSPACE_HOST_DIR}"
   fi
 }
 
 initialize_workspace_structure() {
   local template_root="${SOURCE_DIR}/templates/workspace"
-  local workspace_root="${TARGET_DIR}/workspace/agents"
+  local workspace_root="${WORKSPACE_HOST_DIR}"
 
   migrate_legacy_agent_workspace
 
@@ -178,68 +211,6 @@ initialize_workspace_structure() {
 
   ${SUDO} cp -a --update=none "${template_root}/." "${workspace_root}/"
   ${SUDO} chmod +x "${workspace_root}/scripts/defaults/"*.sh 2>/dev/null || true
-  ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${workspace_root}"
-}
-
-run_workspace_setup() {
-  if [[ "${SKIP_WORKSPACE_SETUP:-}" == "1" ]]; then
-    printf 'Skipping workspace setup (SKIP_WORKSPACE_SETUP=1).\n'
-    return
-  fi
-
-  local workspace_root="${TARGET_DIR}/workspace/agents"
-  local script_path="${WORKSPACE_SETUP_SCRIPT:-${TARGET_DIR}/scripts/workspace-setup.sh}"
-
-  [[ -f "${script_path}" ]] || return 0
-
-  printf '\nRunning workspace setup script: %s\n' "${script_path}"
-
-  local git_config_global="${TARGET_DIR}/config/git/.gitconfig"
-  local ssh_dir="${TARGET_DIR}/config/ssh"
-  local gh_config_dir="${TARGET_DIR}/config/gh"
-
-  local -a envargs=(
-    WORKSPACE_ROOT="${workspace_root}"
-    NERO_PROJECT_DIR="${TARGET_DIR}"
-    NERO_SOURCE_DIR="${SOURCE_DIR}"
-    NERO_SSH_DIR="${ssh_dir}"
-    NERO_GIT_CONFIG="${git_config_global}"
-    GH_CONFIG_DIR="${gh_config_dir}"
-    PATH="${PATH}"
-    HOME="${workspace_root}"
-  )
-  if [[ -f "${git_config_global}" ]]; then
-    envargs+=(GIT_CONFIG_GLOBAL="${git_config_global}")
-  fi
-  if [[ -f "${ssh_dir}/id_ed25519" ]]; then
-    envargs+=(GIT_SSH_COMMAND="ssh -i ${ssh_dir}/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new")
-  fi
-
-  local -a runas=()
-  if getent passwd "${OPENCODE_UID}" >/dev/null 2>&1; then
-    if [[ "${EUID}" -eq "${OPENCODE_UID}" ]]; then
-      runas=()
-    elif command -v sudo >/dev/null 2>&1; then
-      runas=(sudo -u "#${OPENCODE_UID}")
-    else
-      printf 'Warning: sudo not found; running workspace setup as the invoking user.\n' >&2
-    fi
-  else
-    printf 'Warning: no passwd entry for UID %s; running workspace setup as the invoking user.\n' "${OPENCODE_UID}" >&2
-  fi
-
-  "${runas[@]}" env "${envargs[@]}" \
-    bash -s -- "${script_path}" <<'EOS'
-set -euo pipefail
-cd "${WORKSPACE_ROOT}"
-script="$1"
-if [[ -x "${script}" ]]; then
-  exec "${script}"
-else
-  exec bash "${script}"
-fi
-EOS
-
   ${SUDO} chown -R "${OPENCODE_UID}:${OPENCODE_GID}" "${workspace_root}"
 }
 
@@ -438,29 +409,12 @@ GEMINI_API_KEY=$(shell_escape "${GEMINI_API_KEY:-}")
 OPENROUTER_API_KEY=$(shell_escape "${OPENROUTER_API_KEY:-}")
 GITHUB_TOKEN=$(shell_escape "${GITHUB_TOKEN:-}")
 LOCAL_ENDPOINT=$(shell_escape "${LOCAL_ENDPOINT:-}")
-
-WORKSPACE_SETUP_SCRIPT=$(shell_escape "${WORKSPACE_SETUP_SCRIPT:-}")
-SKIP_WORKSPACE_SETUP=$(shell_escape "${SKIP_WORKSPACE_SETUP:-}")
+WORKSPACE_HOST_DIR=$(shell_escape "${WORKSPACE_HOST_DIR}")
 EOF
 
   if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" ]]; then
     ${SUDO} cp "${SOURCE_DIR}/.env" "${TARGET_DIR}/.env"
   fi
-}
-
-run_init_script() {
-  local init_script="${TARGET_DIR}/${INIT_SCRIPT_LOCAL_RELATIVE_PATH}"
-
-  if [[ ! -f "${init_script}" ]]; then
-    return
-  fi
-
-  printf 'Running init script: %s\n' "${init_script}"
-  ${SUDO} env \
-    TARGET_DIR="${TARGET_DIR}" \
-    SOURCE_DIR="${SOURCE_DIR}" \
-    PROJECT_NAME="${PROJECT_NAME}" \
-    bash "${init_script}"
 }
 
 install_docker() {
@@ -512,7 +466,7 @@ prepare_runtime_dirs() {
     "${TARGET_DIR}/data/opencode" \
     "${TARGET_DIR}/data/traefik" \
     "${TARGET_DIR}/traefik/dynamic" \
-    "${TARGET_DIR}/workspace/agents"
+    "${WORKSPACE_HOST_DIR}"
 
   if [[ -d "${TARGET_DIR}/config/git/.gitconfig" ]]; then
     ${SUDO} rm -rf "${TARGET_DIR}/config/git/.gitconfig"
@@ -528,7 +482,7 @@ prepare_runtime_dirs() {
     "${TARGET_DIR}/config/opencode" \
     "${TARGET_DIR}/config/ssh" \
     "${TARGET_DIR}/data/opencode" \
-    "${TARGET_DIR}/workspace/agents"
+    "${WORKSPACE_HOST_DIR}"
   ${SUDO} chmod 700 "${TARGET_DIR}/config/ssh"
   ${SUDO} chmod 755 "${TARGET_DIR}/data/opencode"
 }
@@ -550,6 +504,7 @@ if [[ "${SOURCE_DIR}" != "${TARGET_DIR}" ]]; then
 fi
 load_env_file "${SOURCE_DIR}/.env"
 
+resolve_workspace_host_dir
 detect_proxy_mode
 
 if [[ "${NERO_REMOTE_COMMAND:-}" == "update" ]]; then
@@ -585,9 +540,7 @@ resolve_git_identity
 setup_github_auth
 write_gitconfig
 apply_host_git_identity
-run_workspace_setup
 write_env_file
-run_init_script
 write_traefik_dynamic_config
 install_global_command
 
@@ -603,7 +556,7 @@ Model: ${OPENCODE_MODEL}
 Proxy mode: ${TRAEFIK_MODE}
 
 Project dir: ${TARGET_DIR}
-Workspace dir: ${TARGET_DIR}/workspace/agents
+Workspace dir: ${WORKSPACE_HOST_DIR}
 Command: nero
 Git author: ${GIT_USER_NAME} <${GIT_USER_EMAIL}>
 

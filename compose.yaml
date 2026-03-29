@@ -58,7 +58,7 @@ services:
       - ./config/git/.gitconfig:/home/node/.gitconfig
       - ./config/ssh:/home/node/.ssh
       - ./data/opencode:/data/opencode
-      - ./workspace/agents:/workspace/agents
+      - ${WORKSPACE_HOST_DIR}:/workspace/agents
     networks:
       - edge
 
