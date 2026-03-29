@@ -52,7 +52,7 @@ resolve_workspace_host_dir() {
     install_home="/root"
   fi
 
-  WORKSPACE_HOST_DIR="${install_home}/agents"
+  WORKSPACE_HOST_DIR="${install_home}/nero/workspace/agents"
 }
 
 port_in_use() {
