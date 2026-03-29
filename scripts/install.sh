@@ -68,6 +68,16 @@ compose_config_hash() {
   sha256sum "${TARGET_DIR}/compose.yaml" "${TARGET_DIR}/.env" 2>/dev/null | sha256sum | awk '{print $1}'
 }
 
+read_compose_stamp() {
+  local stamp="$1"
+  [[ -f "${stamp}" ]] || return 1
+  if [[ -r "${stamp}" ]]; then
+    cat "${stamp}"
+    return 0
+  fi
+  ${SUDO} cat "${stamp}" 2>/dev/null
+}
+
 _compose_up() {
   local force_recreate="$1"
   local recreate_args=()
@@ -86,10 +96,15 @@ _compose_up() {
 
 refresh_compose_stack() {
   local stamp="${TARGET_DIR}/data/.nero-compose-signature"
-  local h
+  local h stamped
   h="$(compose_config_hash)"
 
-  if [[ -f "${stamp}" ]] && [[ "$(cat "${stamp}")" == "${h}" ]]; then
+  stamped=""
+  if [[ -f "${stamp}" ]]; then
+    stamped="$(read_compose_stamp "${stamp}" 2>/dev/null)" || true
+  fi
+
+  if [[ -n "${stamped}" ]] && [[ "${stamped}" == "${h}" ]]; then
     _compose_up no
   else
     compose_down
@@ -98,6 +113,7 @@ refresh_compose_stack() {
   fi
 
   printf '%s\n' "${h}" | ${SUDO} tee "${stamp}" >/dev/null
+  ${SUDO} chmod 644 "${stamp}" 2>/dev/null || true
 }
 
 remove_managed_containers() {
