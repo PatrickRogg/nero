@@ -34,8 +34,8 @@ case "${COMMAND}" in
 esac
 
 if [[ ! -t 0 ]]; then
-  if [[ -r /dev/tty ]]; then
-    exec < /dev/tty
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    exec </dev/tty >/dev/tty 2>&1
   else
     printf 'Nero install requires an interactive terminal for onboarding prompts.\n' >&2
     exit 1
@@ -62,6 +62,7 @@ cleanup() {
 trap cleanup EXIT
 
 printf '%s Nero from %s (%s)\n' "$( [[ "${COMMAND}" == "update" ]] && printf 'Updating' || printf 'Installing' )" "${REPO_SLUG}" "${REF}"
+printf 'Preparing interactive installer...\n'
 
 curl -fsSL "${ARCHIVE_URL}" | tar -xzf - --strip-components=1 -C "${TMP_DIR}"
 
