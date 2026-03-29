@@ -33,7 +33,6 @@ services:
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
     networks:
       - edge
-      - nero-edge
 
   opencode:
     build:
@@ -68,8 +67,7 @@ services:
       - edge
 
 networks:
+  # Created by `nero install` (docker network create); shared with other stacks / Traefik.
   edge:
-    name: ${PROJECT_NAME:-nero}-edge
-  nero-edge:
     external: true
     name: ${NERO_EDGE_NETWORK:-nero-edge}
