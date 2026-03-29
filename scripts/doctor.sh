@@ -31,7 +31,7 @@ read_compose_stamp() {
 
 printf 'Nero doctor\n\n'
 printf 'Project dir: %s\n' "${PROJECT_DIR}"
-printf 'Proxy mode: %s\n' "${TRAEFIK_MODE:-external}"
+printf 'Proxy mode: %s\n' "${TRAEFIK_MODE:-self}"
 printf 'Domain: %s\n' "${OPENCODE_DOMAIN:-unset}"
 printf 'Bind port: %s\n' "${OPENCODE_BIND_PORT:-4096}"
 

@@ -27,7 +27,7 @@ That means the simplest internet-safe default is:
 
 In self-proxy mode, Nero now uses Traefik file-based routing instead of Docker label discovery to avoid Docker API compatibility nonsense on some VPS setups.
 
-Default deployment mode is `external`, so Nero assumes another proxy handles SSL unless you explicitly set `TRAEFIK_MODE=self` or `TRAEFIK_MODE=auto`.
+Default deployment mode is `self`, so Nero starts Traefik and manages SSL unless you explicitly set `TRAEFIK_MODE=external` or `TRAEFIK_MODE=auto`.
 
 ## Project layout
 
@@ -101,7 +101,7 @@ Nero supports two install modes automatically:
 - `self`: Nero starts Traefik and manages TLS itself
 - `external`: another proxy already owns `80/443`, so Nero only starts OpenCode on `127.0.0.1:4096`
 
-Default: `external`
+Default: `self`
 
 When `external` mode is detected, point your existing proxy at `127.0.0.1:4096` for the Nero hostname.
 
@@ -109,6 +109,7 @@ You can also set:
 
 - `TRAEFIK_MODE=self` to force Nero-managed SSL
 - `TRAEFIK_MODE=auto` to let Nero decide based on port usage
+- `TRAEFIK_MODE=external` to reuse another reverse proxy intentionally
 
 ## Commands
 

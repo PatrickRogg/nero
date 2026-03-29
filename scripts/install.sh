@@ -39,15 +39,15 @@ port_in_use() {
 }
 
 detect_proxy_mode() {
-  case "${TRAEFIK_MODE:-external}" in
+  case "${TRAEFIK_MODE:-self}" in
     self|external)
-      TRAEFIK_MODE="${TRAEFIK_MODE:-external}"
+      TRAEFIK_MODE="${TRAEFIK_MODE:-self}"
       return
       ;;
     auto)
       ;;
     *)
-      TRAEFIK_MODE="external"
+      TRAEFIK_MODE="self"
       return
       ;;
   esac
