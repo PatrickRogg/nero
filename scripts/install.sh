@@ -16,8 +16,8 @@ fi
 . "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/docker-ubuntu.sh"
 
 DEFAULT_MODEL="openai/gpt-5.4"
-OPENCODE_UID="1000"
-OPENCODE_GID="1000"
+OPENCODE_UID="${OPENCODE_UID:-}"
+OPENCODE_GID="${OPENCODE_GID:-}"
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""
@@ -54,6 +54,27 @@ resolve_workspace_host_dir() {
   fi
 
   WORKSPACE_HOST_DIR="${install_home}/nero/workspace"
+}
+
+resolve_opencode_ids() {
+  local candidate="${OPENCODE_UID:-1000}"
+  if getent passwd "${candidate}" >/dev/null 2>&1; then
+    OPENCODE_UID="${candidate}"
+    if [[ -z "${OPENCODE_GID:-}" ]]; then
+      OPENCODE_GID="$(id -g "$(getent passwd "${OPENCODE_UID}" | cut -d: -f1)" 2>/dev/null || true)"
+    fi
+    if [[ -z "${OPENCODE_GID:-}" ]]; then
+      OPENCODE_GID="${candidate}"
+    fi
+    return 0
+  fi
+  if [[ -d "${WORKSPACE_HOST_DIR}" ]]; then
+    OPENCODE_UID="$(stat -c %u "${WORKSPACE_HOST_DIR}")"
+    OPENCODE_GID="$(stat -c %g "${WORKSPACE_HOST_DIR}")"
+    return 0
+  fi
+  OPENCODE_UID="$(id -u)"
+  OPENCODE_GID="$(id -g)"
 }
 
 port_in_use() {
@@ -508,6 +529,8 @@ LOCAL_ENDPOINT=$(shell_escape "${LOCAL_ENDPOINT:-}")
 WORKSPACE_HOST_DIR=$(shell_escape "${WORKSPACE_HOST_DIR}")
 OPENCODE_CLI_VERSION=$(shell_escape "${OPENCODE_CLI_VERSION:-latest}")
 OPENCODE_BIND_ADDR=$(shell_escape "${OPENCODE_BIND_ADDR}")
+OPENCODE_UID=$(shell_escape "${OPENCODE_UID}")
+OPENCODE_GID=$(shell_escape "${OPENCODE_GID}")
 EOF
 
   if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" ]]; then
@@ -611,6 +634,7 @@ fi
 load_env_file "${SOURCE_DIR}/.env"
 
 resolve_workspace_host_dir
+resolve_opencode_ids
 detect_proxy_mode
 
 if [[ "${NERO_REMOTE_COMMAND:-}" == "update" ]]; then
