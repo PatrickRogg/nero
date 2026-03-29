@@ -1,16 +1,17 @@
 # nero
 
-Dockerized OpenCode for a VPS with:
+OpenCode on the host with Docker only for Traefik:
 
-- Traefik reverse proxy when Nero owns `80/443`
+- Traefik reverse proxy when Nero owns `80/443` (TLS via Cloudflare DNS challenge)
 - automatic fallback for boxes that already have a reverse proxy
-- automatic Let's Encrypt SSL via Cloudflare DNS challenge
-- OpenCode web UI exposed on a custom domain
+- OpenCode web UI on a custom domain; Traefik proxies to host OpenCode via `host.docker.internal`
 - built-in OpenCode HTTP basic auth for both the UI and API
-- persistent agent workspace mounted from the host
-- GitHub repo, PR, and gh CLI support inside the agent container
-- `zsh` and Oh My Zsh installed on fresh Ubuntu bootstrap
-- global `nero` command installed on the VM
+- persistent agent workspace on the host (`~/nero/workspace` by default)
+- GitHub repo, PR, and `gh` CLI support (configs under `/opt/nero/config`, symlinked into the OpenCode service user’s home)
+- host OpenCode managed by `systemd` (`nero-opencode.service`); `nero update` refreshes the `opencode-ai` npm package and restarts the service
+- Node.js 22 from NodeSource when needed, `opencode-ai` installed globally with `npm`
+- `zsh` and Oh My Zsh on fresh Ubuntu bootstrap
+- global `nero` command on the VM
 
 ## Why this setup
 
@@ -23,7 +24,7 @@ That means the simplest internet-safe default is:
 
 1. Nero uses Traefik when the VM owns ports `80/443`, otherwise it reuses the existing reverse proxy
 2. OpenCode handles UI and API password protection
-3. The agent only sees its dedicated workspace mount
+3. The agent uses the host workspace directory with full host tooling (install any extra packages on the VM yourself)
 
 In self-proxy mode, Nero uses Traefik as the machine-level edge with both file-based routes for Nero itself and Docker label discovery for hosted workloads like Appius workspaces.
 
@@ -38,10 +39,8 @@ nero/
   .env.example
   AGENTS.md
   config/opencode/opencode.json
-  opencode/
-    Dockerfile
-    entrypoint.sh
   scripts/
+    run-opencode-host.sh
     bootstrap-ubuntu-24.sh
     doctor.sh
     install.sh
@@ -65,7 +64,9 @@ nero/
 
 The installer now also:
 
-- fixes ownership on mounted OpenCode directories automatically
+- fixes ownership on OpenCode config, data, and workspace directories automatically
+- installs or upgrades Node.js (NodeSource 22.x) when needed, then `opencode-ai` globally (`OPENCODE_CLI_VERSION`, default `latest`)
+- installs and enables `nero-opencode.service` (restarted on every `nero install` / `nero update`)
 - detects when ports `80/443` are already in use
 - skips Nero Traefik automatically on boxes that already have another proxy
 - installs the `nero` command into `/usr/local/bin/nero`
@@ -73,7 +74,7 @@ The installer now also:
 - reuses values already present in `.env` instead of asking every time
 - writes shell-safe `.env` values so names with spaces do not break reinstall
 - installs into `/opt/nero` by default and refreshes that directory during updates
-- installs or upgrades Docker Engine and Docker Compose from Docker's official Ubuntu repo
+- installs or upgrades Docker Engine and Docker Compose from Docker’s official Ubuntu repo (Traefik only)
 
 ## Fresh Ubuntu 24 VM
 
@@ -96,8 +97,8 @@ The bootstrap script installs the host dependencies Nero expects:
 
 Nero supports two install modes automatically:
 
-- `self`: Nero starts Traefik and manages TLS itself
-- `external`: another proxy already owns `80/443`, so Nero only starts OpenCode on `127.0.0.1:4096`
+- `self`: Nero starts Traefik and manages TLS itself; OpenCode listens on `0.0.0.0:${OPENCODE_BIND_PORT:-4096}` so Traefik in Docker can reach the host via `host.docker.internal`
+- `external`: another proxy already owns `80/443`, so OpenCode listens on `127.0.0.1:${OPENCODE_BIND_PORT:-4096}` only
 
 Default: `self`
 
@@ -129,7 +130,7 @@ curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/insta
 `nero update` does two things:
 
 - downloads the latest Nero source archive into a temporary directory
-- reruns the full install workflow so permissions, proxy mode, and containers are repaired from the latest source
+- reruns the full install workflow so permissions, proxy mode, Traefik, and the host OpenCode service (`opencode-ai` npm version + `systemctl restart nero-opencode`) stay aligned with the latest source
 
 That keeps the live install under `/opt/nero` without requiring the Nero repo itself to be cloned on the server.
 
@@ -170,7 +171,7 @@ write branches, and create pull requests.
 
 The automated setup now:
 
-- installs `gh` on the host and in the agent container
+- installs `gh` on the host
 - prompts for git author name and email
 - optionally stores a GitHub token for API and `gh` access
 - writes a dedicated git config that uses `gh auth git-credential`
@@ -211,7 +212,7 @@ Optional hardening you can add later:
 
 If Nero reports `Proxy mode: external`, SSL is handled by your existing reverse proxy, not by Nero.
 
-In that mode, a browser warning like `Not secure` usually means the external proxy is serving the hostname without a valid certificate yet. Nero is only listening on `127.0.0.1:4096` and cannot fix TLS from inside the app container.
+In that mode, a browser warning like `Not secure` usually means the external proxy is serving the hostname without a valid certificate yet. Nero OpenCode is only listening on the loopback address and port from `.env`; TLS is entirely up to that proxy.
 
 ## Provider onboarding
 
@@ -262,10 +263,11 @@ The future admin service for integrations and permissions should be added as a s
 
 ## Notes
 
-- The container starts OpenCode in `/workspace`
+- OpenCode runs under `systemd` with `WorkingDirectory` set to `WORKSPACE_HOST_DIR` (same tree the installer chowns to `OPENCODE_UID`, default `1000`)
+- In `self` mode, bind `0.0.0.0` is required so Traefik can reach the host; restrict port `${OPENCODE_BIND_PORT}` with a host firewall if this machine is multi-tenant
 - The default model is configured from installer onboarding via `OPENCODE_MODEL`
-- OpenCode provider credentials from `/connect` are persisted in the mounted data directory
-- Mounted config/data/workspace directories are auto-owned by the `opencode` container user during install
+- OpenCode provider credentials from `/connect` are persisted under `data/opencode`
+- Config, data, and workspace directories are auto-owned by `OPENCODE_UID` during install
 - `AGENTS.md` gives the instance a default personality; `~/nero/workspace/.agents/SOUL.md` holds voice and values for the workspace by default
 - OpenCode permissions default to allow (no approval prompts); adjust `config/opencode/opencode.json` if you want stricter gates
 - SSL uses the Cloudflare DNS challenge, so certificate renewal stays automatic

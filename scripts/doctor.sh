@@ -64,8 +64,20 @@ else
   printf 'Signature status: mismatch\n'
 fi
 
-printf '\nContainers\n'
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | (grep -E 'NAMES|opencode|traefik' || true)
+printf '\nDocker (Traefik)\n'
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | (grep -E 'NAMES|traefik' || true)
+
+printf '\nOpenCode (systemd)\n'
+if ${SUDO} test -f /etc/systemd/system/nero-opencode.service; then
+  ${SUDO} systemctl is-active nero-opencode.service 2>/dev/null || printf 'unit: inactive or failed\n'
+  ${SUDO} systemctl --no-pager -l status nero-opencode.service 2>/dev/null | head -n 12 || true
+else
+  printf 'nero-opencode.service not installed\n'
+fi
+if command -v opencode >/dev/null 2>&1; then
+  printf 'opencode CLI: %s\n' "$(command -v opencode)"
+  opencode --version 2>/dev/null || true
+fi
 
 printf '\nWorkspace\n'
 for path in \

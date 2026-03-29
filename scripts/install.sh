@@ -148,6 +148,100 @@ compose_down() {
   ${SUDO} docker compose -f "${TARGET_DIR}/compose.yaml" --env-file "${TARGET_DIR}/.env" --profile self-proxy down --remove-orphans || true
 }
 
+ensure_nodejs() {
+  local major=0
+  if need_cmd node && need_cmd npm; then
+    major="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
+    if [[ "${major}" -ge 20 ]]; then
+      return 0
+    fi
+  fi
+
+  if [[ ! -f /etc/apt/sources.list.d/nodesource.list ]]; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | ${SUDO} bash -
+  fi
+  ${SUDO} DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
+}
+
+resolve_opencode_service_user() {
+  OPENCODE_SERVICE_USER="$(getent passwd "${OPENCODE_UID}" | cut -d: -f1 || true)"
+  if [[ -z "${OPENCODE_SERVICE_USER}" ]]; then
+    printf 'No passwd entry for OPENCODE_UID=%s. Create that user or set OPENCODE_UID to an existing account UID.\n' "${OPENCODE_UID}" >&2
+    exit 1
+  fi
+}
+
+link_opencode_runtime_home() {
+  local home_dir=""
+  home_dir="$(getent passwd "${OPENCODE_UID}" | cut -d: -f6 || true)"
+  if [[ -z "${home_dir}" || ! -d "${home_dir}" ]]; then
+    printf 'Skipping gh/git/ssh symlinks: no home directory for UID %s.\n' "${OPENCODE_UID}" >&2
+    return 0
+  fi
+
+  ${SUDO} mkdir -p "${home_dir}/.config"
+  ${SUDO} ln -sfn "${TARGET_DIR}/config/gh" "${home_dir}/.config/gh"
+  ${SUDO} ln -sfn "${TARGET_DIR}/config/git/.gitconfig" "${home_dir}/.gitconfig"
+
+  if [[ ! -e "${home_dir}/.ssh" ]]; then
+    ${SUDO} ln -sfn "${TARGET_DIR}/config/ssh" "${home_dir}/.ssh"
+  elif [[ -L "${home_dir}/.ssh" ]]; then
+    ${SUDO} ln -sfn "${TARGET_DIR}/config/ssh" "${home_dir}/.ssh"
+  else
+    printf 'Note: %s is a real directory; Nero SSH material remains in %s/config/ssh only.\n' "${home_dir}/.ssh" "${TARGET_DIR}" >&2
+  fi
+
+  ${SUDO} chown -h "${OPENCODE_UID}:${OPENCODE_GID}" "${home_dir}/.config/gh" "${home_dir}/.gitconfig" 2>/dev/null || true
+}
+
+install_opencode_cli_global() {
+  ensure_nodejs
+  local ver="${OPENCODE_CLI_VERSION:-latest}"
+  ${SUDO} npm install -g --no-fund --no-audit "opencode-ai@${ver}"
+}
+
+install_opencode_systemd() {
+  resolve_opencode_service_user
+  link_opencode_runtime_home
+
+  local unit_path="/etc/systemd/system/nero-opencode.service"
+  local run_script="${TARGET_DIR}/scripts/run-opencode-host.sh"
+  local svc_group=""
+
+  svc_group="$(id -gn "${OPENCODE_SERVICE_USER}" 2>/dev/null || printf '%s' "${OPENCODE_GID}")"
+
+  ${SUDO} chmod +x "${run_script}"
+
+  ${SUDO} tee "${unit_path}" >/dev/null <<UNIT
+[Unit]
+Description=Nero OpenCode (host)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+User=${OPENCODE_SERVICE_USER}
+Group=${svc_group}
+WorkingDirectory=${WORKSPACE_HOST_DIR}
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=${run_script}
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+  ${SUDO} systemctl daemon-reload
+  ${SUDO} systemctl enable nero-opencode.service
+}
+
+restart_host_opencode() {
+  if ${SUDO} test -f /etc/systemd/system/nero-opencode.service; then
+    ${SUDO} systemctl restart nero-opencode.service
+  fi
+}
+
 install_global_command() {
   local command_target="${TARGET_DIR}/nero"
 
@@ -176,7 +270,7 @@ http:
     opencode:
       loadBalancer:
         servers:
-          - url: http://${PROJECT_NAME}-opencode:4096
+          - url: http://host.docker.internal:${OPENCODE_BIND_PORT:-4096}
 EOF
 }
 
@@ -319,7 +413,7 @@ EOF
   ${SUDO} chmod 600 "${TARGET_DIR}/config/git/.gitconfig"
 }
 
-# Container-only bind-mount does not affect `git` on the host (e.g. ssh as root in the repo).
+# Nero-managed gitconfig under TARGET_DIR is also symlinked into the OpenCode service user's home.
 apply_host_git_identity() {
   if [[ "${SKIP_HOST_GIT_CONFIG:-}" == "1" ]]; then
     return
@@ -412,6 +506,8 @@ OPENROUTER_API_KEY=$(shell_escape "${OPENROUTER_API_KEY:-}")
 GITHUB_TOKEN=$(shell_escape "${GITHUB_TOKEN:-}")
 LOCAL_ENDPOINT=$(shell_escape "${LOCAL_ENDPOINT:-}")
 WORKSPACE_HOST_DIR=$(shell_escape "${WORKSPACE_HOST_DIR}")
+OPENCODE_CLI_VERSION=$(shell_escape "${OPENCODE_CLI_VERSION:-latest}")
+OPENCODE_BIND_ADDR=$(shell_escape "${OPENCODE_BIND_ADDR}")
 EOF
 
   if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" ]]; then
@@ -538,6 +634,17 @@ fi
 OPENCODE_SERVER_USERNAME="${OPENCODE_SERVER_USERNAME:-opencode}"
 TZ="${TZ:-UTC}"
 OPENCODE_BIND_PORT="${OPENCODE_BIND_PORT:-4096}"
+OPENCODE_CLI_VERSION="${OPENCODE_CLI_VERSION:-latest}"
+if [[ -z "${OPENCODE_BIND_ADDR:-}" ]]; then
+  case "${TRAEFIK_MODE}" in
+    self)
+      OPENCODE_BIND_ADDR="0.0.0.0"
+      ;;
+    *)
+      OPENCODE_BIND_ADDR="127.0.0.1"
+      ;;
+  esac
+fi
 set_model_defaults
 prompt_yes_no ENABLE_GITHUB "Enable GitHub integration for repos and PRs? [Y/n]" "y"
 
@@ -555,7 +662,10 @@ write_traefik_dynamic_config
 install_global_command
 ensure_external_edge_network
 
+install_opencode_cli_global
+install_opencode_systemd
 refresh_compose_stack
+restart_host_opencode
 
 cat <<EOF
 
