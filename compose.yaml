@@ -11,6 +11,9 @@ services:
     command:
       - --global.sendanonymoususage=false
       - --api.dashboard=false
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.docker.network=${NERO_EDGE_NETWORK:-nero-edge}
       - --providers.file.directory=/etc/traefik/dynamic
       - --providers.file.watch=true
       - --entrypoints.web.address=:80
@@ -25,10 +28,12 @@ services:
     environment:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN}
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./data/traefik:/var/traefik
       - ./traefik/dynamic:/etc/traefik/dynamic:ro
     networks:
       - edge
+      - nero-edge
 
   opencode:
     build:
@@ -65,3 +70,6 @@ services:
 networks:
   edge:
     name: ${PROJECT_NAME:-nero}-edge
+  nero-edge:
+    external: true
+    name: ${NERO_EDGE_NETWORK:-nero-edge}

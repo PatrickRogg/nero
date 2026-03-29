@@ -25,7 +25,7 @@ That means the simplest internet-safe default is:
 2. OpenCode handles UI and API password protection
 3. The agent only sees its dedicated workspace mount
 
-In self-proxy mode, Nero now uses Traefik file-based routing instead of Docker label discovery to avoid Docker API compatibility nonsense on some VPS setups.
+In self-proxy mode, Nero uses Traefik as the machine-level edge with both file-based routes for Nero itself and Docker label discovery for hosted workloads like Appius workspaces.
 
 Default deployment mode is `self`, so Nero starts Traefik and manages SSL unless you explicitly set `TRAEFIK_MODE=external` or `TRAEFIK_MODE=auto`.
 
@@ -246,6 +246,8 @@ The installer currently supports:
 This initial scaffold exposes one hostname:
 
 - `OPENCODE_DOMAIN` -> OpenCode web UI and API
+
+Nero also owns the shared external Docker edge network `nero-edge`, which other stacks can join when they need Traefik routing through the host-level proxy.
 
 The future admin service for integrations and permissions should be added as a second hostname, for example:
 

@@ -36,6 +36,7 @@ printf 'Project dir: %s\n' "${PROJECT_DIR}"
 printf 'Proxy mode: %s\n' "${TRAEFIK_MODE:-self}"
 printf 'Domain: %s\n' "${OPENCODE_DOMAIN:-unset}"
 printf 'Bind port: %s\n' "${OPENCODE_BIND_PORT:-4096}"
+printf 'Edge network: %s\n' "${NERO_EDGE_NETWORK:-nero-edge}"
 printf 'Workspace dir: %s\n' "${WORKSPACE_ROOT}"
 
 stamp_path="${PROJECT_DIR}/data/.nero-compose-signature"

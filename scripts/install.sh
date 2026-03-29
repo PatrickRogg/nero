@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_NAME="nero"
+NERO_EDGE_NETWORK="${NERO_EDGE_NETWORK:-nero-edge}"
 SOURCE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ -n "${TARGET_DIR:-}" ]]; then
@@ -387,6 +388,7 @@ setup_github_auth() {
 write_env_file() {
   cat > "${SOURCE_DIR}/.env" <<EOF
 PROJECT_NAME=$(shell_escape "${PROJECT_NAME}")
+NERO_EDGE_NETWORK=$(shell_escape "${NERO_EDGE_NETWORK}")
 TZ=$(shell_escape "${TZ:-UTC}")
 TRAEFIK_MODE=$(shell_escape "${TRAEFIK_MODE}")
 OPENCODE_BIND_PORT=$(shell_escape "${OPENCODE_BIND_PORT:-4096}")
@@ -415,6 +417,14 @@ EOF
   if [[ "${TARGET_DIR}" != "${SOURCE_DIR}" ]]; then
     ${SUDO} cp "${SOURCE_DIR}/.env" "${TARGET_DIR}/.env"
   fi
+}
+
+ensure_external_edge_network() {
+  if ${SUDO} docker network inspect "${NERO_EDGE_NETWORK}" >/dev/null 2>&1; then
+    return
+  fi
+
+  ${SUDO} docker network create "${NERO_EDGE_NETWORK}" >/dev/null
 }
 
 install_docker() {
@@ -543,6 +553,7 @@ apply_host_git_identity
 write_env_file
 write_traefik_dynamic_config
 install_global_command
+ensure_external_edge_network
 
 refresh_compose_stack
 
