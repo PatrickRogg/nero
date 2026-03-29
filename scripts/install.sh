@@ -597,6 +597,34 @@ ensure_external_edge_network() {
   ${SUDO} docker network create "${NERO_EDGE_NETWORK}" >/dev/null
 }
 
+# UFW default deny blocks Traefik (on the Docker edge network) from connecting to host OpenCode.
+ensure_ufw_allows_docker_to_host_opencode() {
+  need_cmd ufw || return 0
+  [[ "${TRAEFIK_MODE}" == "self" ]] || return 0
+  if ! ${SUDO} ufw status 2>/dev/null | grep -qi 'Status: active'; then
+    return 0
+  fi
+
+  local port="${OPENCODE_BIND_PORT:-4096}"
+  local subnet=""
+
+  if need_cmd docker && ${SUDO} docker network inspect "${NERO_EDGE_NETWORK}" >/dev/null 2>&1; then
+    subnet="$(${SUDO} docker network inspect "${NERO_EDGE_NETWORK}" -f '{{(index .IPAM.Config 0).Subnet}}' 2>/dev/null | tr -d '\r')"
+  fi
+  if [[ -z "${subnet}" ]]; then
+    subnet="172.16.0.0/12"
+  fi
+
+  if ${SUDO} ufw status verbose 2>/dev/null | grep -q 'nero-docker-to-opencode'; then
+    return 0
+  fi
+
+  printf 'UFW: allowing %s -> host tcp/%s (Traefik to OpenCode).\n' "${subnet}" "${port}" >&2
+  if ! ${SUDO} ufw allow from "${subnet}" to any port "${port}" proto tcp comment 'nero-docker-to-opencode' 2>/dev/null; then
+    ${SUDO} ufw allow from "${subnet}" to any port "${port}" proto tcp
+  fi
+}
+
 install_docker() {
   if need_cmd docker && docker compose version >/dev/null 2>&1; then
     if [[ -f /etc/os-release ]]; then
@@ -737,6 +765,7 @@ write_env_file
 write_traefik_dynamic_config
 install_global_command
 ensure_external_edge_network
+ensure_ufw_allows_docker_to_host_opencode
 
 install_opencode_cli_global
 install_opencode_systemd

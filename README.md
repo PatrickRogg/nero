@@ -266,7 +266,7 @@ The future admin service for integrations and permissions should be added as a s
 ## Notes
 
 - OpenCode runs under `systemd` with `WorkingDirectory` set to `WORKSPACE_HOST_DIR` (same tree the installer chowns to `OPENCODE_UID`, default `1000`)
-- In `self` mode, bind `0.0.0.0` is required so Traefik can reach the host; restrict port `${OPENCODE_BIND_PORT}` with a host firewall if this machine is multi-tenant
+- In `self` mode, OpenCode listens on `0.0.0.0:${OPENCODE_BIND_PORT:-4096}` on the **host** (systemd `nero-opencode.service`), not in Docker. Traefik reaches it at `host.docker.internal` / the Docker bridge. If **UFW** is enabled, the installer adds a rule so the `NERO_EDGE_NETWORK` subnet can reach that port (otherwise HTTPS works but the UI returns bad gateway).
 - The default model is configured from installer onboarding via `OPENCODE_MODEL`
 - OpenCode provider credentials from `/connect` are persisted under `data/opencode`
 - Config, data, and workspace directories are auto-owned by `OPENCODE_UID` during install
