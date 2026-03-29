@@ -126,10 +126,10 @@ compose_down() {
 }
 
 install_global_command() {
-  local command_target="${SOURCE_DIR}/nero"
+  local command_target="${TARGET_DIR}/nero"
 
-  if [[ ! -f "${command_target}" ]]; then
-    command_target="${TARGET_DIR}/nero"
+  if [[ "${SOURCE_DIR}" == "${TARGET_DIR}" && -f "${SOURCE_DIR}/nero" ]]; then
+    command_target="${SOURCE_DIR}/nero"
   fi
 
   ${SUDO} ln -sf "${command_target}" /usr/local/bin/nero

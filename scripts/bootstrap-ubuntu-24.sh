@@ -90,6 +90,6 @@ install_oh_my_zsh "${TARGET_USER}" "${TARGET_HOME}"
 printf '\nUbuntu 24.04 bootstrap complete.\n'
 printf 'Installed: Docker Engine, Docker Compose plugin, gh, git, curl, rsync, nano, ufw, zsh, Oh My Zsh.\n'
 printf 'Firewall: OpenSSH, 80/tcp, and 443/tcp allowed.\n'
-printf 'Next: cp .env.example .env && ./nero install\n'
+printf 'Next: curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash\n'
 
 launch_default_shell

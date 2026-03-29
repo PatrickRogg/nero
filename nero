@@ -19,7 +19,7 @@ Commands:
   bootstrap   Prepare a fresh Ubuntu 24.04 VM
   doctor      Show deployment health and config summary
   install     Install or re-install Nero
-  update      Pull latest repo changes and redeploy Nero
+  update      Fetch latest Nero and redeploy
   help        Show this help
 EOF
 }
@@ -35,7 +35,6 @@ case "${COMMAND}" in
     exec bash "${PROJECT_DIR}/scripts/install.sh"
     ;;
   update)
-    git -C "${PROJECT_DIR}" pull --ff-only
     exec bash "${PROJECT_DIR}/scripts/update.sh"
     ;;
   help|-h|--help)

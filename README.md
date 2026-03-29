@@ -53,17 +53,16 @@ nero/
 
 ## Quick start
 
-1. On a fresh Ubuntu 24.04 VPS, run `sudo ./nero bootstrap`
-2. Copy `.env.example` to `.env` if you want to prefill infra values
-3. Run `./nero install`
-4. Answer only the missing onboarding prompts:
+1. On a fresh Ubuntu 24.04 VPS, optionally run `sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh)"`
+2. Run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash`
+3. Answer only the missing onboarding prompts:
    - domain
    - Let's Encrypt email
    - Cloudflare DNS token
    - OpenCode login password
    - GitHub integration and auth details, only when missing from `.env`
-5. Open `https://<your-domain>`
-6. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
+4. Open `https://<your-domain>`
+5. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
 
 The installer now also:
 
@@ -72,21 +71,18 @@ The installer now also:
 - skips Nero Traefik automatically on boxes that already have another proxy
 - installs the `nero` command into `/usr/local/bin/nero`
 - prepares `gh`, git identity, and SSH material for GitHub workflows
-- runs a local host init script after VM dependencies are installed and the repo is synced
+- runs a local host init script after VM dependencies are installed and the project files are refreshed
 - reuses values already present in `.env` instead of asking every time
 - writes shell-safe `.env` values so names with spaces do not break reinstall
-- deploys in place when run from a git clone, so `nero update` always tracks the real repo
+- installs into `/opt/nero` by default and refreshes that directory during updates
 - installs or upgrades Docker Engine and Docker Compose from Docker's official Ubuntu repo
 
 ## Fresh Ubuntu 24 VM
 
-If you just cloned the repo onto a clean Ubuntu 24.04 server:
+If you want the host prep step on a clean Ubuntu 24.04 server:
 
 ```bash
-sudo bash ./scripts/bootstrap-ubuntu-24.sh
-cp .env.example .env
-nano .env
-./nero install
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh)"
 ```
 
 The bootstrap script installs the host dependencies Nero expects:
@@ -116,7 +112,29 @@ You can also set:
 
 ## Commands
 
-Use the repo wrapper command for common tasks:
+Use the global command after install:
+
+```bash
+nero doctor
+nero install
+nero update
+```
+
+One-line install and update:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash -s -- update
+```
+
+`nero update` does two things:
+
+- downloads the latest Nero source archive into a temporary directory
+- reruns the full install workflow so permissions, proxy mode, and containers are repaired from the latest source
+
+That keeps the live install under `/opt/nero` without requiring the Nero repo itself to be cloned on the server.
+
+If you are developing Nero itself, local repo commands still work:
 
 ```bash
 ./nero bootstrap
@@ -124,22 +142,6 @@ Use the repo wrapper command for common tasks:
 ./nero install
 ./nero update
 ```
-
-After install, the same wrapper is available globally:
-
-```bash
-nero install
-nero doctor
-nero update
-```
-
-`./nero update` does two things:
-
-- pulls the latest repo changes with `git pull --ff-only`
-- reruns the full install workflow so permissions, proxy mode, and containers are repaired from the repo state
-
-If Nero was installed from a git clone, the repo itself is the deployment source.
-That avoids stale copies under `/opt` and keeps `nero update` honest.
 
 ## Workspace layout
 
@@ -165,7 +167,7 @@ Important conventions:
 
 ### Custom workspace setup
 
-After the workspace template is applied and GitHub or git identity is configured, the installer runs an **optional** hook so you can clone repos, download data, or run other idempotent steps:
+After the workspace template is applied and GitHub or git identity is configured, the installer runs an **optional** hook so you can sync repos, download data, or run other idempotent steps:
 
 | Mechanism | Description |
 |-----------|-------------|
@@ -173,7 +175,7 @@ After the workspace template is applied and GitHub or git identity is configured
 | Override | Set `WORKSPACE_SETUP_SCRIPT` in `.env` to an absolute path to your script |
 | Skip | Set `SKIP_WORKSPACE_SETUP=1` in `.env` |
 
-Copy `scripts/workspace-setup.sh.example` to `scripts/workspace-setup.sh`, make it executable (`chmod +x`), and edit. The script runs as the same UID as the OpenCode workspace (default `1000`), with `WORKSPACE_ROOT`, `NERO_PROJECT_DIR`, `NERO_SOURCE_DIR`, `NERO_SSH_DIR`, `GH_CONFIG_DIR`, and git-related env vars set when available. It runs on every `nero install` and `nero update`, so keep it safe to re-run (e.g. `git pull` in existing clones rather than always `git clone` into a fresh path).
+Copy `scripts/workspace-setup.sh.example` to `scripts/workspace-setup.sh`, make it executable (`chmod +x`), and edit. The script runs as the same UID as the OpenCode workspace (default `1000`), with `WORKSPACE_ROOT`, `NERO_PROJECT_DIR`, `NERO_SOURCE_DIR`, `NERO_SSH_DIR`, `GH_CONFIG_DIR`, and git-related env vars set when available. It runs on every `nero install` and `nero update`, so keep it safe to re-run (for example, `git pull` in an existing clone instead of recreating it every time).
 
 ## GitHub integration
 
@@ -197,13 +199,13 @@ After install, if you generated an SSH key, add the printed public key to GitHub
 
 ## One-command install target
 
-The installer is designed so this can later be wrapped as a one-liner like:
+The default install path is already a one-liner:
 
 ```bash
-curl -fsSL https://your-domain/install-nero.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash
 ```
 
-For now it assumes the project files are already present on the VPS.
+It downloads the latest archive from GitHub, installs into `/opt/nero`, and leaves `nero` available globally.
 
 ## Authentication
 
