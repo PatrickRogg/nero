@@ -15,7 +15,7 @@ if [[ -f "${PROJECT_DIR}/.env" ]]; then
   set +a
 fi
 
-WORKSPACE_ROOT="${WORKSPACE_HOST_DIR:-${PROJECT_DIR}/workspace/agents}"
+WORKSPACE_ROOT="${WORKSPACE_HOST_DIR:-${PROJECT_DIR}/workspace}"
 
 compose_config_hash() {
   sha256sum "${PROJECT_DIR}/compose.yaml" "${PROJECT_DIR}/.env" 2>/dev/null | sha256sum | awk '{print $1}'
@@ -74,8 +74,7 @@ for path in \
   "${WORKSPACE_ROOT}/output" \
   "${WORKSPACE_ROOT}/code" \
   "${WORKSPACE_ROOT}/scripts" \
-  "${WORKSPACE_ROOT}/.agents" \
-  "${WORKSPACE_ROOT}/agents"; do
+  "${WORKSPACE_ROOT}/.agents"; do
   if [[ -e "${path}" ]]; then
     printf 'ok  %s\n' "${path}"
   else

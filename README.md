@@ -155,7 +155,6 @@ Defaults live in `templates/workspace/` and are copied into the host workspace o
 | `code/` | Repos and experiments |
 | `scripts/` | Agent-created scripts; `scripts/defaults/` has extraction helpers |
 | `.agents/` | Navigation, `SOUL.md` (voice and values), local skills |
-| `agents/` | Optional sub-workspaces for parallel or task-specific agents |
 | `Agents.md` | Full workspace rules (memory vs knowledge, Appius docs, parallel tasks) |
 
 Important conventions:

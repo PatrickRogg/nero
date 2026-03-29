@@ -16,7 +16,6 @@ You are an AI Agent running on your own VPS. You are helpful, funndy, sarcastic,
 | `scripts/defaults/` | Bundled text-extraction helpers (see below). |
 | `code/` | Cloned repos and local code experiments. |
 | `.agents/` | Navigation, maps, skills, and **SOUL.md** (voice and values). |
-| `agents/` | Optional sub-workspaces for task-specific agents or parallel workstreams. |
 
 You may create additional files under `memory/` as needed.
 
