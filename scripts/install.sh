@@ -235,6 +235,18 @@ ensure_nodejs() {
   ${SUDO} DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs
 }
 
+# Host SQLite CLI (e.g. scripts that read OpenCode's opencode.db, jq + sqlite3).
+ensure_sqlite3() {
+  if need_cmd sqlite3; then
+    return 0
+  fi
+  if ! need_cmd apt-get; then
+    printf 'sqlite3 is not installed and apt-get was not found; install the sqlite3 package manually.\n' >&2
+    return 1
+  fi
+  ${SUDO} DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends sqlite3
+}
+
 resolve_opencode_service_user() {
   OPENCODE_SERVICE_USER="$(getent passwd "${OPENCODE_UID}" | cut -d: -f1 || true)"
   if [[ -z "${OPENCODE_SERVICE_USER}" ]]; then
@@ -268,6 +280,7 @@ link_opencode_runtime_home() {
 
 install_opencode_cli_global() {
   ensure_nodejs
+  ensure_sqlite3
   local ver="${OPENCODE_CLI_VERSION:-latest}"
   ${SUDO} npm install -g --no-fund --no-audit "opencode-ai@${ver}"
 }
