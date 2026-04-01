@@ -1,6 +1,52 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+install_or_update_docker_ubuntu() {
+  if [[ ! -f /etc/os-release ]]; then
+    printf 'Cannot detect operating system.\n' >&2
+    return 1
+  fi
+
+  . /etc/os-release
+
+  if [[ "${ID:-}" != "ubuntu" ]]; then
+    printf 'Automatic Docker setup currently supports Ubuntu only.\n' >&2
+    return 1
+  fi
+
+  export DEBIAN_FRONTEND=noninteractive
+
+  apt-get update
+  apt-get install -y --no-install-recommends ca-certificates curl gnupg
+
+  install -m 0755 -d /etc/apt/keyrings
+
+  if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+  fi
+
+  local arch
+  local codename
+  arch="$(dpkg --print-architecture)"
+  codename="${VERSION_CODENAME}"
+
+  cat > /etc/apt/sources.list.d/docker.list <<EOF
+deb [arch=${arch} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${codename} stable
+EOF
+
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    docker-ce \
+    docker-ce-cli \
+    containerd.io \
+    docker-buildx-plugin \
+    docker-compose-plugin
+
+  systemctl enable docker
+  systemctl restart docker
+}
+
 if [[ -f /etc/os-release ]]; then
   . /etc/os-release
 else
@@ -14,11 +60,9 @@ if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
 fi
 
 if [[ "${EUID}" -ne 0 ]]; then
-  printf 'Please run this script as root: sudo bash scripts/bootstrap-ubuntu-24.sh\n' >&2
+  printf 'Please run this script as root.\n' >&2
   exit 1
 fi
-
-. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/lib/docker-ubuntu.sh"
 
 TARGET_USER="${SUDO_USER:-root}"
 TARGET_HOME="$(getent passwd "${TARGET_USER}" | cut -d: -f6)"
@@ -91,6 +135,6 @@ install_oh_my_zsh "${TARGET_USER}" "${TARGET_HOME}"
 printf '\nUbuntu 24.04 bootstrap complete.\n'
 printf 'Installed: Docker Engine, Docker Compose plugin, gh, git, curl, rsync, nano, sqlite3, ufw, zsh, Oh My Zsh.\n'
 printf 'Firewall: OpenSSH, 80/tcp, and 443/tcp allowed.\n'
-printf 'Next: curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash\n'
+printf 'Next: curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh && bash /tmp/install-remote.sh\n'
 
 launch_default_shell

@@ -51,8 +51,8 @@ nero/
 
 ## Quick start
 
-1. On a fresh Ubuntu 24.04 VPS, optionally run `sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh)"`
-2. Run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash`
+1. On a fresh Ubuntu 24.04 VPS, optionally run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh -o /tmp/bootstrap-ubuntu-24.sh && bash /tmp/bootstrap-ubuntu-24.sh`
+2. Run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh && bash /tmp/install-remote.sh`
 3. Answer only the missing onboarding prompts:
    - domain
    - Let's Encrypt email
@@ -81,7 +81,8 @@ The installer now also:
 If you want the host prep step on a clean Ubuntu 24.04 server:
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh)"
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh -o /tmp/bootstrap-ubuntu-24.sh
+bash /tmp/bootstrap-ubuntu-24.sh
 ```
 
 The bootstrap script installs the host dependencies Nero expects:
@@ -123,8 +124,9 @@ nero update
 One-line install and update:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash
-curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash -s -- update
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh
+bash /tmp/install-remote.sh
+bash /tmp/install-remote.sh update
 ```
 
 `nero update` does two things:
@@ -191,7 +193,8 @@ After install, if you generated an SSH key, add the printed public key to GitHub
 The default install path is already a one-liner:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh | bash
+curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh
+bash /tmp/install-remote.sh
 ```
 
 It downloads the latest archive from GitHub, installs into `/opt/nero`, and leaves `nero` available globally.
