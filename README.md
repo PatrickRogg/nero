@@ -13,6 +13,60 @@ OpenCode on the host with Docker only for Traefik:
 - `zsh` and Oh My Zsh on fresh Ubuntu bootstrap
 - global `nero` command on the VM
 
+## License
+
+[MIT](./LICENSE)
+
+## Requirements
+
+Minimum requirements to get a working install:
+
+- Ubuntu 24.04 is the intended target
+- a public hostname for OpenCode, for example `ai.example.com`
+- one of these proxy situations:
+  - ports `80/443` available on the VM so Nero can run Traefik itself
+  - an existing reverse proxy that can forward the hostname to `127.0.0.1:4096`
+- if Nero manages TLS itself: a Cloudflare-managed DNS zone and a Cloudflare API token with DNS edit access
+- outbound internet access for package installs, GitHub archive download, and npm
+- enough privilege to install packages, write to `/opt/nero`, create a `systemd` unit, and install `/usr/local/bin/nero`
+
+Optional but common:
+
+- a GitHub token and SSH key setup if you want repo and PR workflows
+- an OpenAI ChatGPT Plus/Pro account if you want the default `/connect` flow instead of API keys
+
+## Setup
+
+Fast path on a fresh Ubuntu 24.04 VM:
+
+1. Optional host prep:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh -o /tmp/bootstrap-ubuntu-24.sh
+   bash /tmp/bootstrap-ubuntu-24.sh
+   ```
+2. Install Nero:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh
+   bash /tmp/install-remote.sh
+   ```
+3. Provide the values Nero cannot infer:
+   - `OPENCODE_DOMAIN`
+   - `OPENCODE_SERVER_PASSWORD`
+   - `LETSENCRYPT_EMAIL` and `CF_DNS_API_TOKEN` when using Nero-managed TLS
+   - GitHub auth details only if you enable GitHub integration and they are not already present
+4. Open `https://<your-domain>`
+5. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
+
+What the installer does for you:
+
+- installs or upgrades Docker Engine and Docker Compose when needed
+- installs or upgrades Node.js, then installs `opencode-ai` globally
+- installs and enables `nero-opencode.service`
+- creates the host workspace at `~/nero/workspace` by default
+- detects whether to run its own Traefik or reuse an existing reverse proxy
+- prepares optional GitHub CLI, git config, and SSH material
+- installs the `nero` command into `/usr/local/bin/nero`
+
 ## Why this setup
 
 Current OpenCode docs support protecting `opencode serve` and `opencode web` with:
@@ -48,33 +102,6 @@ nero/
   templates/workspace/
   # agent workspace is created in the installing user's home directory
 ```
-
-## Quick start
-
-1. On a fresh Ubuntu 24.04 VPS, optionally run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/bootstrap-ubuntu-24.sh -o /tmp/bootstrap-ubuntu-24.sh && bash /tmp/bootstrap-ubuntu-24.sh`
-2. Run `curl -fsSL https://raw.githubusercontent.com/PatrickRogg/nero/main/scripts/install-remote.sh -o /tmp/install-remote.sh && bash /tmp/install-remote.sh`
-3. Answer only the missing onboarding prompts:
-   - domain
-   - Let's Encrypt email
-   - Cloudflare DNS token
-   - OpenCode login password
-   - GitHub integration and auth details, only when missing from `.env`
-4. Open `https://<your-domain>`
-5. If you chose OpenAI subscription auth, run `/connect` in OpenCode and select `OpenAI` -> `ChatGPT Plus/Pro`
-
-The installer now also:
-
-- fixes ownership on OpenCode config, data, and workspace directories automatically
-- installs or upgrades Node.js (NodeSource 22.x) when needed, then `opencode-ai` globally (`OPENCODE_CLI_VERSION`, default `latest`)
-- installs and enables `nero-opencode.service` (restarted on every `nero install` / `nero update`)
-- detects when ports `80/443` are already in use
-- skips Nero Traefik automatically on boxes that already have another proxy
-- installs the `nero` command into `/usr/local/bin/nero`
-- prepares `gh`, git identity, and SSH material for GitHub workflows
-- reuses values already present in `.env` instead of asking every time
-- writes shell-safe `.env` values so names with spaces do not break reinstall
-- installs into `/opt/nero` by default and refreshes that directory during updates
-- installs or upgrades Docker Engine and Docker Compose from Docker’s official Ubuntu repo (Traefik only)
 
 ## Fresh Ubuntu 24 VM
 
@@ -133,6 +160,8 @@ bash /tmp/install-remote.sh update
 
 - downloads the latest Nero source archive into a temporary directory
 - reruns the full install workflow so permissions, proxy mode, Traefik, and the host OpenCode service (`opencode-ai` npm version + `systemctl restart nero-opencode`) stay aligned with the latest source
+
+`nero doctor` also checks the installed `opencode` CLI version against the latest `opencode-ai` version published on npm when `npm` can reach the registry.
 
 The installer itself is idempotent: it removes any legacy `nero-opencode` Docker container and `/opt/nero/opencode` if present, bumps the internal stack signature when `scripts/install.sh` or `scripts/run-opencode-host.sh` change so Traefik is recreated when needed, and resolves `OPENCODE_UID` to a real passwd account when the workspace is owned by an orphan numeric uid.
 
@@ -266,6 +295,13 @@ The future admin service for integrations and permissions should be added as a s
 - Traefik ACME data: `data/traefik/`
 - Agent workspace: `~/nero/workspace/` by default (`WORKSPACE_HOST_DIR` overrides it)
 - Git worktrees vs OpenCode: run `nero sync-oc-worktrees` (runs `scripts/oc-sync-worktrees.sh` from the Nero install) to register linked git worktrees in OpenCode’s `sandboxes` list in SQLite (`data/opencode/opencode/opencode.db` under the install dir when present).
+
+## OpenCode versioning
+
+- Nero installs `opencode-ai` globally with `npm`
+- by default, install and update use `OPENCODE_CLI_VERSION=latest`
+- you can pin a version in `.env` by setting `OPENCODE_CLI_VERSION`
+- `nero doctor` shows the installed `opencode` version and the latest npm version so you can see when the host is behind
 
 ## Notes
 

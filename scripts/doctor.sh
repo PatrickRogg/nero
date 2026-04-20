@@ -36,6 +36,13 @@ compose_config_hash() {
   sha256sum "${inputs[@]}" 2>/dev/null | sha256sum | awk '{print $1}'
 }
 
+get_latest_opencode_version() {
+  if ! command -v npm >/dev/null 2>&1; then
+    return 1
+  fi
+  npm view opencode-ai version 2>/dev/null
+}
+
 read_compose_stamp() {
   local stamp="$1"
   [[ -f "${stamp}" ]] || return 1
@@ -89,9 +96,26 @@ if ${SUDO} test -f /etc/systemd/system/nero-opencode.service; then
 else
   printf 'nero-opencode.service not installed\n'
 fi
+installed_opencode_version=""
 if command -v opencode >/dev/null 2>&1; then
   printf 'opencode CLI: %s\n' "$(command -v opencode)"
-  opencode --version 2>/dev/null || true
+  installed_opencode_version="$(opencode --version 2>/dev/null || true)"
+  if [[ -n "${installed_opencode_version}" ]]; then
+    printf 'Installed version: %s\n' "${installed_opencode_version}"
+  fi
+fi
+latest_opencode_version="$(get_latest_opencode_version || true)"
+if [[ -n "${latest_opencode_version}" ]]; then
+  printf 'Latest npm version: %s\n' "${latest_opencode_version}"
+  if [[ -n "${installed_opencode_version}" ]]; then
+    if [[ "${installed_opencode_version}" == "${latest_opencode_version}" ]]; then
+      printf 'Version status: up to date\n'
+    else
+      printf 'Version status: update available\n'
+    fi
+  fi
+else
+  printf 'Latest npm version: unavailable\n'
 fi
 
 printf '\nWorkspace\n'
