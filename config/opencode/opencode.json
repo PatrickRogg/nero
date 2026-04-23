@@ -2,5 +2,13 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "{env:OPENCODE_MODEL}",
   "permission": "allow",
-  "instructions": ["Agents.md", ".agents/SOUL.md"]
+  "instructions": ["Agents.md", ".agents/SOUL.md"],
+  "plugin": [
+    "opencode-cursor-oauth"
+  ],
+  "provider": {
+    "cursor": {
+      "name": "Cursor"
+    }
+  }
 }
