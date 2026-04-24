@@ -14,6 +14,20 @@ set -a
 . "${ENV_FILE}"
 set +a
 
+opencode_home="$(getent passwd "${OPENCODE_UID:-$(id -u)}" | cut -d: -f6 || true)"
+if [[ -z "${opencode_home}" ]]; then
+  opencode_home="${HOME:-}"
+fi
+
+if [[ -n "${opencode_home}" ]]; then
+  export HOME="${opencode_home}"
+  for extra_bin in "${HOME}/.bun/bin" "${HOME}/.local/bin" "${HOME}/bin"; do
+    if [[ -d "${extra_bin}" ]]; then
+      export PATH="${extra_bin}:${PATH}"
+    fi
+  done
+fi
+
 export XDG_CONFIG_HOME="${NERO_DIR}/config"
 export XDG_DATA_HOME="${NERO_DIR}/data/opencode"
 export GH_CONFIG_DIR="${NERO_DIR}/config/gh"

@@ -308,8 +308,14 @@ install_opencode_systemd() {
   local unit_path="/etc/systemd/system/nero-opencode.service"
   local run_script="${TARGET_DIR}/scripts/run-opencode-host.sh"
   local svc_group=""
+  local home_dir=""
+  local svc_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
   svc_group="$(id -gn "${OPENCODE_SERVICE_USER}" 2>/dev/null || printf '%s' "${OPENCODE_GID}")"
+  home_dir="$(getent passwd "${OPENCODE_UID}" | cut -d: -f6 || true)"
+  if [[ -n "${home_dir}" ]]; then
+    svc_path="${home_dir}/.bun/bin:${home_dir}/.local/bin:${home_dir}/bin:${svc_path}"
+  fi
 
   ${SUDO} chmod +x "${run_script}"
 
@@ -326,7 +332,8 @@ RestartSec=5
 User=${OPENCODE_SERVICE_USER}
 Group=${svc_group}
 WorkingDirectory=${WORKSPACE_HOST_DIR}
-Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=${home_dir}
+Environment=PATH=${svc_path}
 ExecStart=${run_script}
 
 [Install]
